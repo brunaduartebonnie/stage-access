@@ -1,0 +1,1903 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Stage Access</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root {
+  --bg: #0a0a0c;
+  --surface: #13131a;
+  --surface2: #1c1c28;
+  --border: #2a2a3a;
+  --gold: #c9a84c;
+  --gold-light: #e8c76a;
+  --gold-dim: rgba(201,168,76,0.15);
+  --text: #f0ede8;
+  --text-muted: #8a8799;
+  --text-dim: #555566;
+  --red: #e05555;
+  --green: #4caf82;
+  --blue: #5588cc;
+  --purple: #8855cc;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --accent: var(--gold);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* ── VIEWS ── */
+.view{display:none;min-height:100vh;}
+.view.active{display:flex;flex-direction:column;}
+
+/* ── TOP BAR ── */
+.topbar{
+  display:flex;align-items:center;gap:12px;
+  padding:16px 20px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+.topbar-logo{font-size:13px;font-weight:700;letter-spacing:3px;color:var(--gold);text-transform:uppercase;}
+.topbar-title{font-size:15px;font-weight:600;color:var(--text);flex:1;}
+.topbar-back{
+  background:none;border:none;color:var(--text-muted);cursor:pointer;
+  display:flex;align-items:center;gap:6px;font-size:13px;padding:6px 10px;
+  border-radius:var(--radius-sm);transition:all .2s;
+}
+.topbar-back:hover{background:var(--surface2);color:var(--text);}
+.topbar-back svg{width:16px;height:16px;}
+
+/* ── PAGE CONTENT ── */
+.page-content{flex:1;padding:20px;max-width:600px;width:100%;margin:0 auto;}
+.page-content.wide{max-width:900px;}
+
+/* ── LANDING ── */
+#view-landing{
+  background:var(--bg);
+  justify-content:center;align-items:center;
+  position:relative;overflow:hidden;
+}
+.landing-bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(201,168,76,0.08) 0%, transparent 70%);
+  pointer-events:none;
+}
+.landing-inner{
+  display:flex;flex-direction:column;align-items:center;
+  padding:40px 24px;text-align:center;
+  position:relative;z-index:1;width:100%;max-width:420px;
+}
+.landing-icon{
+  width:80px;height:80px;
+  background:linear-gradient(135deg,var(--gold),#a07830);
+  border-radius:20px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:28px;
+  box-shadow:0 8px 32px rgba(201,168,76,0.3);
+}
+.landing-icon svg{width:44px;height:44px;color:#000;}
+.landing-brand{font-size:28px;font-weight:800;letter-spacing:4px;text-transform:uppercase;color:var(--text);margin-bottom:6px;}
+.landing-sub{font-size:13px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:48px;}
+.landing-btns{display:flex;flex-direction:column;gap:14px;width:100%;}
+.btn-landing{
+  display:flex;align-items:center;gap:16px;
+  padding:18px 24px;
+  border-radius:var(--radius);
+  border:none;cursor:pointer;
+  font-size:15px;font-weight:600;text-align:left;
+  transition:all .25s;width:100%;
+}
+.btn-landing-master{
+  background:linear-gradient(135deg,var(--gold),#a07830);
+  color:#000;
+}
+.btn-landing-master:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(201,168,76,0.35);}
+.btn-landing-check{
+  background:var(--surface);
+  color:var(--text);
+  border:1px solid var(--border);
+}
+.btn-landing-check:hover{border-color:var(--gold);background:var(--gold-dim);}
+.btn-landing-icon{
+  width:44px;height:44px;min-width:44px;
+  border-radius:10px;background:rgba(0,0,0,0.2);
+  display:flex;align-items:center;justify-content:center;
+}
+.btn-landing-icon svg{width:22px;height:22px;}
+.btn-landing-text{display:flex;flex-direction:column;gap:3px;}
+.btn-landing-text span{font-size:11px;font-weight:400;opacity:.7;}
+
+/* ── BUTTONS ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px 20px;border-radius:var(--radius-sm);border:none;
+  font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;
+  text-decoration:none;white-space:nowrap;
+}
+.btn svg{width:16px;height:16px;flex-shrink:0;}
+.btn-primary{background:linear-gradient(135deg,var(--gold),#a07830);color:#000;}
+.btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--gold);background:var(--gold-dim);}
+.btn-danger{background:rgba(224,85,85,0.1);color:var(--red);border:1px solid rgba(224,85,85,0.3);}
+.btn-danger:hover{background:rgba(224,85,85,0.2);}
+.btn-ghost{background:none;color:var(--text-muted);border:none;}
+.btn-ghost:hover{color:var(--text);background:var(--surface2);}
+.btn-sm{padding:7px 14px;font-size:12px;}
+.btn-lg{padding:14px 28px;font-size:15px;}
+.btn-full{width:100%;}
+.btn-icon{
+  width:36px;height:36px;padding:0;min-width:36px;
+  border-radius:var(--radius-sm);
+}
+
+/* ── CARDS ── */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px;
+  transition:border-color .2s;
+}
+.card:hover{border-color:rgba(201,168,76,0.3);}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.card-title{font-size:14px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:1px;}
+.card-muted{font-size:12px;color:var(--text-muted);}
+
+/* ── FORM ── */
+.form-group{margin-bottom:18px;}
+.form-label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.form-input,.form-select,.form-textarea{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);
+  padding:10px 14px;font-size:14px;font-family:inherit;
+  transition:border-color .2s;outline:none;
+}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--gold);}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8799' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:40px;}
+.form-textarea{resize:vertical;min-height:80px;}
+.form-hint{font-size:11px;color:var(--text-dim);margin-top:6px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* ── FILE UPLOAD ── */
+.upload-zone{
+  border:2px dashed var(--border);border-radius:var(--radius);
+  padding:24px;text-align:center;cursor:pointer;
+  transition:all .2s;background:var(--surface2);
+}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--gold);background:var(--gold-dim);}
+.upload-zone input{display:none;}
+.upload-zone svg{width:32px;height:32px;color:var(--text-dim);margin-bottom:8px;}
+.upload-zone p{font-size:13px;color:var(--text-muted);}
+.upload-zone small{font-size:11px;color:var(--text-dim);}
+.upload-preview{
+  width:80px;height:80px;object-fit:contain;
+  border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--surface2);display:none;
+}
+.upload-preview.show{display:block;}
+
+/* ── BADGE CHIPS ── */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.badge-gold{background:rgba(201,168,76,0.15);color:var(--gold);border:1px solid rgba(201,168,76,0.3);}
+.badge-green{background:rgba(76,175,130,0.15);color:var(--green);border:1px solid rgba(76,175,130,0.3);}
+.badge-blue{background:rgba(85,136,204,0.15);color:var(--blue);border:1px solid rgba(85,136,204,0.3);}
+.badge-purple{background:rgba(136,85,204,0.15);color:var(--purple);border:1px solid rgba(136,85,204,0.3);}
+.badge-red{background:rgba(224,85,85,0.15);color:var(--red);border:1px solid rgba(224,85,85,0.3);}
+.badge-gray{background:rgba(138,135,153,0.15);color:var(--text-muted);border:1px solid var(--border);}
+
+/* ── LISTS ── */
+.list-item{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 16px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);
+  margin-bottom:10px;cursor:pointer;transition:all .2s;
+}
+.list-item:hover{border-color:rgba(201,168,76,0.4);background:var(--surface2);}
+.list-item-avatar{
+  width:44px;height:44px;min-width:44px;
+  border-radius:10px;background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:700;color:var(--gold);
+  overflow:hidden;
+}
+.list-item-avatar img{width:100%;height:100%;object-fit:cover;}
+.list-item-body{flex:1;min-width:0;}
+.list-item-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.list-item-sub{font-size:12px;color:var(--text-muted);margin-top:2px;}
+.list-item-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px;text-align:center;
+}
+.stat-value{font-size:28px;font-weight:800;color:var(--gold);}
+.stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-top:4px;}
+
+/* ── SECTION HEADER ── */
+.section-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;margin-top:24px;
+}
+.section-title{font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;}
+
+/* ── EMPTY STATE ── */
+.empty-state{
+  text-align:center;padding:48px 24px;
+  color:var(--text-dim);
+}
+.empty-state svg{width:48px;height:48px;margin-bottom:16px;opacity:.4;}
+.empty-state p{font-size:14px;color:var(--text-muted);margin-bottom:8px;}
+.empty-state small{font-size:12px;}
+
+/* ── MODAL ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.7);
+  display:none;align-items:center;justify-content:center;
+  z-index:1000;padding:20px;
+  backdrop-filter:blur(4px);
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:24px;
+  width:100%;max-width:480px;max-height:90vh;overflow-y:auto;
+  position:relative;
+}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:20px;color:var(--text);}
+.modal-close{
+  position:absolute;top:16px;right:16px;
+  background:none;border:none;color:var(--text-muted);
+  cursor:pointer;padding:4px;border-radius:6px;
+}
+.modal-close:hover{color:var(--text);background:var(--surface2);}
+
+/* ── DIVIDER ── */
+.divider{height:1px;background:var(--border);margin:20px 0;}
+
+/* ── CREDENTIAL BADGE ── */
+.credential-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  gap:20px;padding:20px 0;
+}
+#credential-badge{
+  width:300px;
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  background:var(--badge-bg,#0d0d14);
+  position:relative;
+  flex-shrink:0;
+}
+.badge-accent-stripe{
+  height:5px;
+  background:linear-gradient(90deg,var(--badge-accent,#c9a84c),transparent);
+}
+.badge-header{
+  padding:16px 16px 8px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.badge-event-logo{
+  width:48px;height:48px;object-fit:contain;border-radius:6px;
+  background:rgba(255,255,255,0.05);
+}
+.badge-event-logo-placeholder{
+  width:48px;height:48px;border-radius:6px;
+  background:rgba(255,255,255,0.08);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:800;color:var(--badge-accent,#c9a84c);
+}
+.badge-sa-label{
+  font-size:8px;font-weight:800;letter-spacing:3px;
+  color:rgba(255,255,255,0.25);text-transform:uppercase;
+}
+.badge-artist-section{
+  padding:8px 16px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.badge-artist-name{
+  font-size:13px;font-weight:700;
+  color:var(--badge-accent,#c9a84c);
+  text-transform:uppercase;letter-spacing:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.badge-event-name{
+  font-size:10px;color:rgba(255,255,255,0.4);
+  margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.badge-person-section{padding:14px 16px 10px;}
+.badge-person-name{
+  font-size:18px;font-weight:800;color:#fff;
+  line-height:1.2;
+  word-break:break-word;
+}
+.badge-person-role{
+  font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;
+}
+.badge-access-section{padding:0 16px 12px;}
+.badge-access-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 12px;border-radius:20px;
+  font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+  background:var(--badge-accent,#c9a84c);color:#000;
+}
+.badge-date{font-size:10px;color:rgba(255,255,255,0.35);margin-top:8px;}
+.badge-codes-section{
+  padding:12px 16px 16px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  background:rgba(255,255,255,0.03);
+  border-top:1px solid rgba(255,255,255,0.06);
+}
+.badge-qr{
+  width:80px;height:80px;
+  background:#fff;padding:4px;border-radius:6px;
+}
+.badge-qr canvas,.badge-qr img{width:72px!important;height:72px!important;}
+.badge-barcode-wrap{width:100%;}
+.badge-barcode-wrap svg{max-width:100%;height:36px;}
+.badge-footer-label{
+  font-size:7px;letter-spacing:2px;color:rgba(255,255,255,0.15);
+  text-transform:uppercase;text-align:center;
+}
+
+/* ── SCANNER VIEW ── */
+#view-scanner{background:var(--bg);}
+.scanner-wrapper{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:20px;gap:20px;
+  position:relative;
+}
+#qr-reader{
+  width:100%;max-width:360px;
+  border-radius:var(--radius);overflow:hidden;
+  border:2px solid var(--gold);
+  box-shadow:0 0 40px rgba(201,168,76,0.2);
+}
+#qr-reader video{border-radius:calc(var(--radius) - 2px);}
+.scanner-hint{font-size:13px;color:var(--text-muted);text-align:center;}
+.scan-result-overlay{
+  position:fixed;inset:0;
+  display:none;flex-direction:column;
+  align-items:center;justify-content:center;
+  z-index:200;padding:24px;
+  backdrop-filter:blur(8px);
+}
+.scan-result-overlay.show{display:flex;}
+.scan-result-overlay.valid{background:rgba(76,175,130,0.15);}
+.scan-result-overlay.invalid{background:rgba(224,85,85,0.15);}
+.scan-result-card{
+  background:var(--surface);border-radius:var(--radius);
+  padding:32px 24px;text-align:center;max-width:320px;width:100%;
+  border:2px solid;
+}
+.scan-result-card.valid{border-color:var(--green);box-shadow:0 0 40px rgba(76,175,130,0.3);}
+.scan-result-card.invalid{border-color:var(--red);box-shadow:0 0 40px rgba(224,85,85,0.3);}
+.scan-icon{
+  width:72px;height:72px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 16px;
+}
+.scan-icon svg{width:36px;height:36px;}
+.scan-icon.valid{background:rgba(76,175,130,0.2);color:var(--green);}
+.scan-icon.invalid{background:rgba(224,85,85,0.2);color:var(--red);}
+.scan-name{font-size:22px;font-weight:800;margin-bottom:6px;}
+.scan-detail{font-size:13px;color:var(--text-muted);margin-bottom:4px;}
+.scan-access{margin:14px 0;display:flex;justify-content:center;}
+.scan-dismiss{
+  margin-top:20px;width:100%;padding:12px;
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:var(--radius-sm);
+  font-size:14px;font-weight:600;cursor:pointer;
+}
+
+/* ── SESSION QR MODAL ── */
+.session-qr-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  gap:16px;padding:8px 0;
+}
+.session-qr-box{
+  background:#fff;padding:12px;border-radius:var(--radius);
+  display:flex;align-items:center;justify-content:center;
+}
+.session-qr-box canvas{display:block;}
+.session-qr-info{font-size:12px;color:var(--text-muted);text-align:center;line-height:1.6;}
+
+/* ── COLOR PICKER SWATCHES ── */
+.color-swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;}
+.color-swatch{
+  width:32px;height:32px;border-radius:50%;cursor:pointer;
+  border:3px solid transparent;transition:all .2s;
+}
+.color-swatch.active{border-color:#fff;transform:scale(1.15);}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.tab{
+  padding:10px 18px;font-size:13px;font-weight:600;color:var(--text-muted);
+  border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;
+  transition:all .2s;margin-bottom:-1px;
+}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:12px 20px;
+  font-size:13px;color:var(--text);
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  z-index:9999;transition:transform .3s ease;
+  white-space:nowrap;max-width:90vw;
+}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.success{border-color:var(--green);color:var(--green);}
+#toast.error{border-color:var(--red);color:var(--red);}
+
+/* ── RESPONSIVE ── */
+@media(max-width:500px){
+  .form-row{grid-template-columns:1fr;}
+  .stats-grid{grid-template-columns:repeat(3,1fr);}
+  #credential-badge{width:280px;}
+}
+
+/* ── ADMIN CHECK LANDING ── */
+.ac-scanner-prompt{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:40px 24px;text-align:center;gap:16px;
+}
+.ac-scanner-prompt svg{width:64px;height:64px;color:var(--gold);opacity:.6;}
+.ac-scanner-prompt h2{font-size:20px;font-weight:700;color:var(--text);}
+.ac-scanner-prompt p{font-size:13px;color:var(--text-muted);line-height:1.6;}
+
+/* ── SPINNER ── */
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinner{
+  width:20px;height:20px;border:2px solid var(--border);
+  border-top-color:var(--gold);border-radius:50%;
+  animation:spin .6s linear infinite;
+  display:inline-block;
+}
+
+/* ── CHECKIN LOG ── */
+.checkin-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-radius:var(--radius-sm);
+  background:var(--surface2);border:1px solid var(--border);
+  margin-bottom:8px;
+}
+.checkin-item-name{font-size:13px;font-weight:600;color:var(--text);}
+.checkin-item-time{font-size:11px;color:var(--text-muted);}
+.checkin-item-access{font-size:11px;color:var(--gold);}
+
+/* ── IMPORT FEEDBACK ── */
+.import-feedback{
+  padding:12px 16px;border-radius:var(--radius-sm);
+  font-size:13px;margin-top:12px;display:none;
+}
+.import-feedback.show{display:block;}
+.import-feedback.success{background:rgba(76,175,130,0.1);color:var(--green);border:1px solid rgba(76,175,130,0.2);}
+.import-feedback.error{background:rgba(224,85,85,0.1);color:var(--red);border:1px solid rgba(224,85,85,0.2);}
+
+/* ── CREDENTIAL ACTIONS ── */
+.cred-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+
+/* Custom scrollbar for modal */
+.modal::-webkit-scrollbar{width:4px;}
+.modal::-webkit-scrollbar-thumb{background:var(--border);}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     LANDING
+══════════════════════════════════════════════ -->
+<div id="view-landing" class="view active">
+  <div class="landing-bg"></div>
+  <div class="landing-inner">
+    <div class="landing-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <div class="landing-brand">Stage Access</div>
+    <div class="landing-sub">Event Credentialing System</div>
+    <div class="landing-btns">
+      <button class="btn-landing btn-landing-master" onclick="showView('dashboard')">
+        <div class="btn-landing-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            <path d="M18 11l2 2 4-4" stroke-width="2.5"/>
+          </svg>
+        </div>
+        <div class="btn-landing-text">
+          Master Event
+          <span>Gerir eventos e credenciais</span>
+        </div>
+      </button>
+      <button class="btn-landing btn-landing-check" onclick="startAdminCheck()">
+        <div class="btn-landing-icon" style="color:var(--gold)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+          </svg>
+        </div>
+        <div class="btn-landing-text">
+          Admin Check
+          <span>Scanner de credenciais</span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MASTER DASHBOARD
+══════════════════════════════════════════════ -->
+<div id="view-dashboard" class="view">
+  <div class="topbar">
+    <div class="topbar-logo">Stage Access</div>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary btn-sm" onclick="showView('create-event')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Novo Evento
+    </button>
+  </div>
+  <div class="page-content">
+    <div class="section-header" style="margin-top:8px">
+      <span class="section-title">Os Meus Eventos</span>
+    </div>
+    <div id="events-list">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <p>Nenhum evento criado</p>
+        <small>Clica em "Novo Evento" para começar</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     CREATE / EDIT EVENT
+══════════════════════════════════════════════ -->
+<div id="view-create-event" class="view">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Voltar
+    </button>
+    <div class="topbar-title" id="create-event-title">Novo Evento</div>
+  </div>
+  <div class="page-content">
+    <div id="event-form-content">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">Informação do Evento</span></div>
+        <div class="form-group">
+          <label class="form-label">Nome do Evento *</label>
+          <input id="ev-name" class="form-input" type="text" placeholder="Ex: Coldplay • World Tour 2026">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Data</label>
+            <input id="ev-date" class="form-input" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Local / Venue</label>
+            <input id="ev-venue" class="form-input" type="text" placeholder="Ex: Altice Arena, Lisboa">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nome do Artista / Tour</label>
+          <input id="ev-artist" class="form-input" type="text" placeholder="Ex: Coldplay">
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">Identidade Visual</span></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Logo do Evento</label>
+            <label class="upload-zone" id="event-logo-zone">
+              <input type="file" accept="image/*" onchange="handleLogoUpload(this,'event')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <p>Logo do evento</p><small>PNG, JPG, SVG</small>
+            </label>
+            <img id="event-logo-preview" class="upload-preview" alt="logo">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Logo do Artista</label>
+            <label class="upload-zone" id="artist-logo-zone">
+              <input type="file" accept="image/*" onchange="handleLogoUpload(this,'artist')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <p>Logo do artista</p><small>PNG, JPG, SVG</small>
+            </label>
+            <img id="artist-logo-preview" class="upload-preview" alt="logo">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cor de Destaque da Credencial</label>
+          <div class="color-swatches" id="color-swatches">
+            <div class="color-swatch active" style="background:#c9a84c" data-color="#c9a84c" onclick="selectColor(this)"></div>
+            <div class="color-swatch" style="background:#e05555" data-color="#e05555" onclick="selectColor(this)"></div>
+            <div class="color-swatch" style="background:#5588cc" data-color="#5588cc" onclick="selectColor(this)"></div>
+            <div class="color-swatch" style="background:#4caf82" data-color="#4caf82" onclick="selectColor(this)"></div>
+            <div class="color-swatch" style="background:#cc5588" data-color="#cc5588" onclick="selectColor(this)"></div>
+            <div class="color-swatch" style="background:#f07030" data-color="#f07030" onclick="selectColor(this)"></div>
+            <div class="color-swatch" style="background:#8855cc" data-color="#8855cc" onclick="selectColor(this)"></div>
+            <div class="color-swatch" style="background:#ffffff" data-color="#ffffff" onclick="selectColor(this)" style="border:1px solid #444"></div>
+          </div>
+          <input id="ev-color" type="hidden" value="#c9a84c">
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">Tipos de Acesso</span></div>
+        <div id="access-types-list">
+          <div class="list-item" style="cursor:default;padding:10px 12px;" data-access="All Access">
+            <div class="list-item-body"><div class="list-item-name">All Access</div></div>
+            <span class="badge badge-gold">Predefinido</span>
+          </div>
+          <div class="list-item" style="cursor:default;padding:10px 12px;" data-access="Backstage">
+            <div class="list-item-body"><div class="list-item-name">Backstage</div></div>
+            <span class="badge badge-gray">Predefinido</span>
+          </div>
+          <div class="list-item" style="cursor:default;padding:10px 12px;" data-access="Press / Media">
+            <div class="list-item-body"><div class="list-item-name">Press / Media</div></div>
+            <span class="badge badge-gray">Predefinido</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:12px;">
+          <input id="new-access-type" class="form-input" type="text" placeholder="Novo tipo de acesso...">
+          <button class="btn btn-secondary" onclick="addAccessType()">Adicionar</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:8px;">
+        <button class="btn btn-primary btn-lg" style="flex:1" onclick="saveEvent()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Guardar Evento
+        </button>
+        <button class="btn btn-secondary btn-lg" onclick="goBack()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     EVENT DETAIL
+══════════════════════════════════════════════ -->
+<div id="view-event-detail" class="view">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showView('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Eventos
+    </button>
+    <div class="topbar-title" id="event-detail-name">—</div>
+    <button class="btn btn-ghost btn-icon btn-sm" onclick="editCurrentEvent()" title="Editar evento">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    </button>
+  </div>
+  <div class="page-content">
+    <div id="event-info-bar" style="margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;gap:12px">
+      <div id="event-detail-logo" style="width:40px;height:40px;min-width:40px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;overflow:hidden;"></div>
+      <div style="flex:1;min-width:0">
+        <div id="event-detail-artist" style="font-size:13px;font-weight:700;color:var(--gold)"></div>
+        <div id="event-detail-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px"></div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="openSessionQR()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        QR Sessão
+      </button>
+    </div>
+
+    <div class="stats-grid" id="event-stats">
+      <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Staff</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-credentials">0</div><div class="stat-label">Credenciais</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-checkins">0</div><div class="stat-label">Entradas</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('staff',this)">Staff</button>
+      <button class="tab" onclick="switchTab('checkins',this)">Check-ins</button>
+    </div>
+
+    <!-- STAFF TAB -->
+    <div id="tab-staff">
+      <div class="section-header" style="margin-top:0">
+        <span class="section-title">Membros</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="openImportCSV()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Importar CSV
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="showView('add-staff')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Adicionar
+          </button>
+        </div>
+      </div>
+      <div id="staff-list"></div>
+    </div>
+
+    <!-- CHECKINS TAB -->
+    <div id="tab-checkins" style="display:none">
+      <div class="section-header" style="margin-top:0">
+        <span class="section-title">Registo de Entradas</span>
+        <button class="btn btn-danger btn-sm" onclick="clearCheckins()">Limpar</button>
+      </div>
+      <div id="checkins-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ADD / EDIT STAFF
+══════════════════════════════════════════════ -->
+<div id="view-add-staff" class="view">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showView('event-detail')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Voltar
+    </button>
+    <div class="topbar-title" id="add-staff-title">Novo Membro</div>
+  </div>
+  <div class="page-content">
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">Nome Completo *</label>
+        <input id="staff-name" class="form-input" type="text" placeholder="Nome da pessoa credenciada">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Função / Cargo</label>
+        <input id="staff-role" class="form-input" type="text" placeholder="Ex: Production Manager, Security, Press...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input id="staff-email" class="form-input" type="email" placeholder="email@exemplo.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefone</label>
+          <input id="staff-phone" class="form-input" type="tel" placeholder="+351 9xx xxx xxx">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo de Acesso *</label>
+        <select id="staff-access" class="form-select">
+          <option value="">Seleccionar acesso...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notas</label>
+        <textarea id="staff-notes" class="form-textarea" placeholder="Informação adicional..."></textarea>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:16px;">
+      <button class="btn btn-primary btn-lg" style="flex:1" onclick="saveMember()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Guardar
+      </button>
+      <button class="btn btn-secondary btn-lg" onclick="showView('event-detail')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     CREDENTIAL / BADGE VIEW
+══════════════════════════════════════════════ -->
+<div id="view-credential" class="view">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showView('event-detail')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Voltar
+    </button>
+    <div class="topbar-title">Credencial</div>
+  </div>
+  <div class="page-content">
+    <div class="credential-wrap">
+      <!-- BADGE -->
+      <div id="credential-badge">
+        <div class="badge-accent-stripe" id="badge-stripe"></div>
+        <div class="badge-header">
+          <div id="badge-event-logo-wrap"></div>
+          <div class="badge-sa-label">Stage Access</div>
+        </div>
+        <div class="badge-artist-section">
+          <div class="badge-artist-name" id="badge-artist-name">—</div>
+          <div class="badge-event-name" id="badge-event-name">—</div>
+        </div>
+        <div class="badge-person-section">
+          <div class="badge-person-name" id="badge-person-name">—</div>
+          <div class="badge-person-role" id="badge-person-role">—</div>
+        </div>
+        <div class="badge-access-section">
+          <div class="badge-access-chip" id="badge-access-chip">—</div>
+          <div class="badge-date" id="badge-date">—</div>
+        </div>
+        <div class="badge-codes-section">
+          <div class="badge-qr" id="badge-qr-code"></div>
+          <div class="badge-barcode-wrap">
+            <svg id="badge-barcode"></svg>
+          </div>
+          <div class="badge-footer-label" id="badge-cred-id">—</div>
+        </div>
+      </div>
+
+      <!-- ACTIONS -->
+      <div class="cred-actions">
+        <button class="btn btn-primary" onclick="downloadBadgeImage()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Imagem PNG
+        </button>
+        <button class="btn btn-secondary" onclick="printBadge()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Imprimir
+        </button>
+        <button class="btn btn-secondary" onclick="shareCredential()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Partilhar
+        </button>
+      </div>
+
+      <!-- MEMBER INFO -->
+      <div class="card" style="width:100%">
+        <div class="card-header">
+          <span class="card-title">Detalhes do Membro</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" id="edit-member-btn" onclick="editCurrentMember()">Editar</button>
+            <button class="btn btn-danger btn-sm" id="delete-member-btn" onclick="deleteCurrentMember()">Eliminar</button>
+          </div>
+        </div>
+        <div id="member-detail-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ADMIN CHECK — SCAN SESSION QR
+══════════════════════════════════════════════ -->
+<div id="view-admin-check-entry" class="view">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showView('landing')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Início
+    </button>
+    <div class="topbar-title">Admin Check</div>
+  </div>
+  <div class="ac-scanner-prompt">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+    </svg>
+    <h2>Lê o QR de Sessão</h2>
+    <p>Pede ao Master Event que gere o QR de sessão do evento. Aponta a câmara para o código para entrar no modo scanner.</p>
+    <div id="entry-qr-reader" style="width:100%;max-width:320px;margin-top:8px;border-radius:var(--radius);overflow:hidden;border:2px solid var(--gold);"></div>
+    <button class="btn btn-primary btn-lg" onclick="startEntryScanner()" id="start-entry-scan-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Iniciar Câmara
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ADMIN CHECK — SCANNER
+══════════════════════════════════════════════ -->
+<div id="view-scanner" class="view">
+  <div class="topbar">
+    <button class="topbar-back" onclick="exitScanner()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Sair
+    </button>
+    <div class="topbar-title" id="scanner-event-name">Scanner</div>
+    <span class="badge badge-green" style="font-size:10px">
+      <span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 1.5s infinite"></span>
+      Live
+    </span>
+  </div>
+  <div class="scanner-wrapper">
+    <div id="qr-reader"></div>
+    <p class="scanner-hint">Aponta a câmara para a credencial do membro</p>
+    <div id="scanner-stats" style="display:flex;gap:16px;text-align:center;">
+      <div><div class="stat-value" id="scan-count-ok" style="font-size:22px">0</div><div class="stat-label">Entradas</div></div>
+      <div><div class="stat-value" id="scan-count-err" style="font-size:22px;color:var(--red)">0</div><div class="stat-label">Inválidos</div></div>
+    </div>
+  </div>
+
+  <!-- RESULT OVERLAY -->
+  <div class="scan-result-overlay" id="scan-result-overlay">
+    <div class="scan-result-card" id="scan-result-card">
+      <div class="scan-icon" id="scan-result-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="scan-name" id="scan-result-name">—</div>
+      <div class="scan-detail" id="scan-result-role">—</div>
+      <div class="scan-access">
+        <span class="badge badge-gold" id="scan-result-access">—</span>
+      </div>
+      <div class="scan-detail" id="scan-result-event">—</div>
+      <div class="scan-detail" id="scan-result-msg" style="margin-top:8px;font-weight:600"></div>
+      <button class="scan-dismiss" onclick="dismissScanResult()">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════ -->
+
+<!-- Session QR Modal -->
+<div class="modal-overlay" id="modal-session-qr">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-session-qr')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="modal-title">QR de Sessão — Admin Check</div>
+    <div class="session-qr-wrap">
+      <div class="session-qr-box" id="session-qr-container"></div>
+      <div class="session-qr-info">
+        Mostra este QR code ao Admin Check.<br>
+        Ao lê-lo, o telemovel entra directamente no modo scanner para este evento.
+      </div>
+      <button class="btn btn-primary btn-full" onclick="refreshSessionQR()">Regenerar QR</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import CSV Modal -->
+<div class="modal-overlay" id="modal-import-csv">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-import-csv')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="modal-title">Importar Staff via CSV</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+      O ficheiro CSV deve ter as colunas (em qualquer ordem):<br>
+      <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">nome, funcao, email, telefone, acesso</code>
+    </p>
+    <div style="margin-bottom:12px">
+      <button class="btn btn-ghost btn-sm" onclick="downloadCSVTemplate()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descarregar template CSV
+      </button>
+    </div>
+    <label class="upload-zone" id="csv-upload-zone">
+      <input type="file" accept=".csv,text/csv" id="csv-file-input" onchange="handleCSVUpload(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <p>Clica ou arrasta o ficheiro CSV</p>
+    </label>
+    <div class="import-feedback" id="import-feedback"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Print styles -->
+<style id="print-styles">
+@media print {
+  body > *{display:none!important;}
+  #print-area{display:block!important;}
+}
+#print-area{display:none;}
+</style>
+<div id="print-area"></div>
+
+<style>
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+</style>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════
+const DB_KEY = 'stage-access-db';
+let state = {
+  events: [],
+  staff: [],
+  checkins: [],
+};
+let currentEventId = null;
+let currentMemberId = null;
+let editingEventId = null;
+let editingMemberId = null;
+let entryHtml5QrCode = null;
+let scannerHtml5QrCode = null;
+let scanOkCount = 0;
+let scanErrCount = 0;
+let viewStack = [];
+
+// ════════════════════════════════════════════════════════
+//  PERSISTENCE
+// ════════════════════════════════════════════════════════
+function saveDB() {
+  try { localStorage.setItem(DB_KEY, JSON.stringify(state)); } catch(e) {}
+}
+function loadDB() {
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch(e) {}
+}
+
+// ════════════════════════════════════════════════════════
+//  ROUTING
+// ════════════════════════════════════════════════════════
+function showView(name, pushStack = true) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const v = document.getElementById('view-' + name);
+  if (v) {
+    v.classList.add('active');
+    window.scrollTo(0,0);
+  }
+  if (pushStack && name !== 'landing') viewStack.push(name);
+
+  // Init views
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'event-detail') renderEventDetail();
+  if (name === 'create-event') initCreateEventForm();
+  if (name === 'add-staff') initAddStaffForm();
+  if (name === 'credential') renderCredential();
+}
+
+function goBack() {
+  viewStack.pop();
+  const prev = viewStack[viewStack.length - 1] || 'dashboard';
+  showView(prev, false);
+}
+
+// ════════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════════
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 3000);
+}
+
+// ════════════════════════════════════════════════════════
+//  MODAL
+// ════════════════════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ════════════════════════════════════════════════════════
+//  EVENTS
+// ════════════════════════════════════════════════════════
+function renderDashboard() {
+  const list = document.getElementById('events-list');
+  if (!state.events.length) {
+    list.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <p>Nenhum evento criado</p><small>Clica em "Novo Evento" para começar</small>
+    </div>`;
+    return;
+  }
+  list.innerHTML = state.events.map(ev => {
+    const memberCount = state.staff.filter(s => s.eventId === ev.id).length;
+    const checkinCount = state.checkins.filter(c => c.eventId === ev.id).length;
+    const dateStr = ev.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'short',year:'numeric'}) : 'Data a definir';
+    return `<div class="list-item" onclick="openEvent('${ev.id}')">
+      <div class="list-item-avatar">${ev.eventLogoData ? `<img src="${ev.eventLogoData}">` : `<span style="font-size:20px">${(ev.name||'?')[0].toUpperCase()}</span>`}</div>
+      <div class="list-item-body">
+        <div class="list-item-name">${esc(ev.name)}</div>
+        <div class="list-item-sub">${esc(ev.artist||'—')} · ${dateStr}</div>
+      </div>
+      <div class="list-item-right">
+        <span class="badge badge-gray">${memberCount} staff</span>
+        ${checkinCount > 0 ? `<span class="badge badge-green">${checkinCount} entradas</span>` : ''}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openEvent(id) {
+  currentEventId = id;
+  showView('event-detail');
+}
+
+let tempEventLogoData = null;
+let tempArtistLogoData = null;
+let customAccessTypes = [];
+
+function initCreateEventForm() {
+  const ev = editingEventId ? state.events.find(e => e.id === editingEventId) : null;
+  document.getElementById('create-event-title').textContent = ev ? 'Editar Evento' : 'Novo Evento';
+  document.getElementById('ev-name').value = ev ? ev.name : '';
+  document.getElementById('ev-date').value = ev ? ev.date : '';
+  document.getElementById('ev-venue').value = ev ? ev.venue : '';
+  document.getElementById('ev-artist').value = ev ? ev.artist : '';
+  document.getElementById('ev-color').value = ev ? (ev.accentColor || '#c9a84c') : '#c9a84c';
+
+  // Reset logo previews
+  tempEventLogoData = ev ? ev.eventLogoData : null;
+  tempArtistLogoData = ev ? ev.artistLogoData : null;
+  const elp = document.getElementById('event-logo-preview');
+  const alp = document.getElementById('artist-logo-preview');
+  if (tempEventLogoData) { elp.src = tempEventLogoData; elp.classList.add('show'); }
+  else { elp.classList.remove('show'); elp.src=''; }
+  if (tempArtistLogoData) { alp.src = tempArtistLogoData; alp.classList.add('show'); }
+  else { alp.classList.remove('show'); alp.src=''; }
+
+  // Color swatches
+  const color = ev ? (ev.accentColor || '#c9a84c') : '#c9a84c';
+  document.querySelectorAll('.color-swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.color === color);
+  });
+
+  // Custom access types
+  customAccessTypes = ev ? (ev.customAccessTypes || []) : [];
+  renderAccessTypesList();
+}
+
+function handleLogoUpload(input, type) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    if (type === 'event') {
+      tempEventLogoData = e.target.result;
+      const el = document.getElementById('event-logo-preview');
+      el.src = tempEventLogoData; el.classList.add('show');
+    } else {
+      tempArtistLogoData = e.target.result;
+      const el = document.getElementById('artist-logo-preview');
+      el.src = tempArtistLogoData; el.classList.add('show');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function selectColor(el) {
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('ev-color').value = el.dataset.color;
+}
+
+function renderAccessTypesList() {
+  const defaults = ['All Access', 'Backstage', 'Press / Media'];
+  const container = document.getElementById('access-types-list');
+  container.innerHTML = defaults.map(a => `
+    <div class="list-item" style="cursor:default;padding:10px 12px;" data-access="${a}">
+      <div class="list-item-body"><div class="list-item-name">${esc(a)}</div></div>
+      <span class="badge badge-gray">Predefinido</span>
+    </div>
+  `).join('') + customAccessTypes.map((a,i) => `
+    <div class="list-item" style="cursor:default;padding:10px 12px;">
+      <div class="list-item-body"><div class="list-item-name">${esc(a)}</div></div>
+      <button class="btn btn-danger btn-sm" onclick="removeAccessType(${i})">Remover</button>
+    </div>
+  `).join('');
+}
+
+function addAccessType() {
+  const input = document.getElementById('new-access-type');
+  const val = input.value.trim();
+  if (!val) return;
+  if (customAccessTypes.includes(val)) { toast('Tipo já existe', 'error'); return; }
+  customAccessTypes.push(val);
+  input.value = '';
+  renderAccessTypesList();
+}
+
+function removeAccessType(i) {
+  customAccessTypes.splice(i,1);
+  renderAccessTypesList();
+}
+
+function saveEvent() {
+  const name = document.getElementById('ev-name').value.trim();
+  if (!name) { toast('Nome do evento obrigatório', 'error'); return; }
+
+  const ev = {
+    id: editingEventId || uid(),
+    name,
+    date: document.getElementById('ev-date').value,
+    venue: document.getElementById('ev-venue').value.trim(),
+    artist: document.getElementById('ev-artist').value.trim(),
+    accentColor: document.getElementById('ev-color').value,
+    eventLogoData: tempEventLogoData,
+    artistLogoData: tempArtistLogoData,
+    customAccessTypes: [...customAccessTypes],
+    sessionToken: editingEventId ? (state.events.find(e=>e.id===editingEventId)||{}).sessionToken || uid() : uid(),
+    createdAt: editingEventId ? (state.events.find(e=>e.id===editingEventId)||{}).createdAt || Date.now() : Date.now(),
+  };
+
+  if (editingEventId) {
+    const idx = state.events.findIndex(e=>e.id===editingEventId);
+    if (idx >= 0) state.events[idx] = ev;
+  } else {
+    state.events.push(ev);
+  }
+
+  saveDB();
+  editingEventId = null;
+  currentEventId = ev.id;
+  toast(editingEventId ? 'Evento actualizado' : 'Evento criado!', 'success');
+  showView('event-detail');
+}
+
+function editCurrentEvent() {
+  editingEventId = currentEventId;
+  showView('create-event');
+}
+
+// ════════════════════════════════════════════════════════
+//  EVENT DETAIL
+// ════════════════════════════════════════════════════════
+function renderEventDetail() {
+  const ev = state.events.find(e => e.id === currentEventId);
+  if (!ev) { showView('dashboard'); return; }
+
+  document.getElementById('event-detail-name').textContent = ev.name;
+  document.getElementById('event-detail-artist').textContent = ev.artist || ev.name;
+  const dateStr = ev.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'}) : '';
+  document.getElementById('event-detail-meta').textContent = [ev.venue, dateStr].filter(Boolean).join(' · ');
+
+  const logoWrap = document.getElementById('event-detail-logo');
+  if (ev.eventLogoData) {
+    logoWrap.innerHTML = `<img src="${ev.eventLogoData}" style="width:100%;height:100%;object-fit:contain">`;
+  } else {
+    logoWrap.innerHTML = `<span style="font-size:18px;font-weight:800;color:var(--gold)">${(ev.name||'?')[0].toUpperCase()}</span>`;
+  }
+
+  const members = state.staff.filter(s => s.eventId === currentEventId);
+  const checkins = state.checkins.filter(c => c.eventId === currentEventId);
+  const credCount = members.filter(m => m.credentialId).length;
+
+  document.getElementById('stat-total').textContent = members.length;
+  document.getElementById('stat-credentials').textContent = credCount;
+  document.getElementById('stat-checkins').textContent = checkins.length;
+
+  renderStaffList(members);
+  renderCheckinsList(checkins, members);
+
+  // Populate access types select
+  populateAccessSelect(ev);
+}
+
+function renderStaffList(members) {
+  const list = document.getElementById('staff-list');
+  if (!members.length) {
+    list.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      <p>Nenhum membro adicionado</p><small>Adiciona manualmente ou importa via CSV</small>
+    </div>`;
+    return;
+  }
+  list.innerHTML = members.map(m => {
+    const accessColor = accessBadgeClass(m.access);
+    return `<div class="list-item" onclick="openMember('${m.id}')">
+      <div class="list-item-avatar" style="background:${accessBg(m.access)};color:${accessFg(m.access)}">
+        ${m.name ? m.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase() : '?'}
+      </div>
+      <div class="list-item-body">
+        <div class="list-item-name">${esc(m.name)}</div>
+        <div class="list-item-sub">${esc(m.role||'—')}</div>
+      </div>
+      <div class="list-item-right">
+        <span class="badge ${accessColor}">${esc(m.access||'—')}</span>
+        ${m.credentialId ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:var(--green)" title="Credencial emitida"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderCheckinsList(checkins, members) {
+  const list = document.getElementById('checkins-list');
+  if (!checkins.length) {
+    list.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="20 6 9 17 4 12"/></svg>
+      <p>Nenhuma entrada registada</p><small>Os check-ins aparecerão aqui</small>
+    </div>`;
+    return;
+  }
+  const sorted = [...checkins].sort((a,b) => b.ts - a.ts);
+  list.innerHTML = sorted.map(c => {
+    const m = members.find(m => m.credentialId === c.credentialId);
+    const time = new Date(c.ts).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
+    const date = new Date(c.ts).toLocaleDateString('pt-PT',{day:'numeric',month:'short'});
+    return `<div class="checkin-item">
+      <div>
+        <div class="checkin-item-name">${esc(m ? m.name : 'Desconhecido')}</div>
+        <div class="checkin-item-access">${esc(m ? m.access : '—')}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="checkin-item-time">${time}</div>
+        <div class="checkin-item-time">${date}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-staff').style.display = tab === 'staff' ? '' : 'none';
+  document.getElementById('tab-checkins').style.display = tab === 'checkins' ? '' : 'none';
+}
+
+function clearCheckins() {
+  if (!confirm('Limpar todos os check-ins deste evento?')) return;
+  state.checkins = state.checkins.filter(c => c.eventId !== currentEventId);
+  saveDB();
+  renderEventDetail();
+  toast('Check-ins limpos', 'success');
+}
+
+// ════════════════════════════════════════════════════════
+//  STAFF / MEMBER
+// ════════════════════════════════════════════════════════
+function populateAccessSelect(ev) {
+  const sel = document.getElementById('staff-access');
+  const defaults = ['All Access', 'Backstage', 'Press / Media'];
+  const custom = ev ? (ev.customAccessTypes || []) : [];
+  const all = [...defaults, ...custom];
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Seleccionar acesso...</option>' +
+    all.map(a => `<option value="${esc(a)}" ${a === current ? 'selected' : ''}>${esc(a)}</option>`).join('');
+}
+
+function initAddStaffForm() {
+  const m = editingMemberId ? state.staff.find(s => s.id === editingMemberId) : null;
+  document.getElementById('add-staff-title').textContent = m ? 'Editar Membro' : 'Novo Membro';
+  document.getElementById('staff-name').value = m ? m.name : '';
+  document.getElementById('staff-role').value = m ? m.role : '';
+  document.getElementById('staff-email').value = m ? m.email : '';
+  document.getElementById('staff-phone').value = m ? m.phone : '';
+  document.getElementById('staff-notes').value = m ? m.notes : '';
+
+  const ev = state.events.find(e => e.id === currentEventId);
+  populateAccessSelect(ev);
+  if (m) document.getElementById('staff-access').value = m.access;
+}
+
+function saveMember() {
+  const name = document.getElementById('staff-name').value.trim();
+  const access = document.getElementById('staff-access').value;
+  if (!name) { toast('Nome obrigatório', 'error'); return; }
+  if (!access) { toast('Selecciona um tipo de acesso', 'error'); return; }
+
+  const memberId = editingMemberId || uid();
+  const existing = editingMemberId ? state.staff.find(s => s.id === editingMemberId) : null;
+
+  const member = {
+    id: memberId,
+    eventId: currentEventId,
+    name,
+    role: document.getElementById('staff-role').value.trim(),
+    email: document.getElementById('staff-email').value.trim(),
+    phone: document.getElementById('staff-phone').value.trim(),
+    notes: document.getElementById('staff-notes').value.trim(),
+    access,
+    credentialId: existing ? existing.credentialId : null,
+    credentialQRData: existing ? existing.credentialQRData : null,
+    createdAt: existing ? existing.createdAt : Date.now(),
+  };
+
+  if (editingMemberId) {
+    const idx = state.staff.findIndex(s => s.id === editingMemberId);
+    if (idx >= 0) state.staff[idx] = member;
+    editingMemberId = null;
+  } else {
+    // Auto-generate credential
+    member.credentialId = 'CRED-' + uid(8).toUpperCase();
+    const qrPayload = JSON.stringify({
+      type: 'stage-access-credential',
+      credId: member.credentialId,
+      eventId: currentEventId,
+      name: member.name,
+      role: member.role,
+      access: member.access,
+      issued: Date.now(),
+    });
+    member.credentialQRData = qrPayload;
+    state.staff.push(member);
+  }
+
+  saveDB();
+  currentMemberId = member.id;
+  toast('Membro guardado!', 'success');
+  showView('credential');
+}
+
+function openMember(id) {
+  currentMemberId = id;
+  editingMemberId = null;
+  showView('credential');
+}
+
+function editCurrentMember() {
+  editingMemberId = currentMemberId;
+  showView('add-staff');
+}
+
+function deleteCurrentMember() {
+  if (!confirm('Eliminar este membro e a sua credencial?')) return;
+  state.staff = state.staff.filter(s => s.id !== currentMemberId);
+  state.checkins = state.checkins.filter(c => {
+    const m = state.staff.find(s => s.id === currentMemberId);
+    return m ? c.credentialId !== m.credentialId : true;
+  });
+  saveDB();
+  currentMemberId = null;
+  toast('Membro eliminado');
+  showView('event-detail');
+}
+
+// ════════════════════════════════════════════════════════
+//  CREDENTIAL / BADGE
+// ════════════════════════════════════════════════════════
+function renderCredential() {
+  const member = state.staff.find(s => s.id === currentMemberId);
+  if (!member) { showView('event-detail'); return; }
+  const ev = state.events.find(e => e.id === member.eventId);
+  if (!ev) { showView('event-detail'); return; }
+
+  const accent = ev.accentColor || '#c9a84c';
+  const badge = document.getElementById('credential-badge');
+  badge.style.setProperty('--badge-accent', accent);
+
+  document.getElementById('badge-stripe').style.background = `linear-gradient(90deg,${accent},transparent)`;
+  document.getElementById('badge-artist-name').textContent = ev.artist || ev.name;
+  document.getElementById('badge-event-name').textContent = ev.name + (ev.date ? ' · ' + new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'short',year:'numeric'}) : '');
+  document.getElementById('badge-person-name').textContent = member.name;
+  document.getElementById('badge-person-role').textContent = member.role || '';
+  document.getElementById('badge-access-chip').textContent = member.access;
+  document.getElementById('badge-access-chip').style.background = accent;
+  document.getElementById('badge-access-chip').style.color = isLightColor(accent) ? '#000' : '#fff';
+  document.getElementById('badge-date').textContent = ev.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'}) : '';
+  document.getElementById('badge-cred-id').textContent = member.credentialId || '';
+
+  // Event logo
+  const logoWrap = document.getElementById('badge-event-logo-wrap');
+  if (ev.eventLogoData) {
+    logoWrap.innerHTML = `<img class="badge-event-logo" src="${ev.eventLogoData}">`;
+  } else {
+    logoWrap.innerHTML = `<div class="badge-event-logo-placeholder">${(ev.name||'?')[0].toUpperCase()}</div>`;
+  }
+
+  // QR code
+  const qrWrap = document.getElementById('badge-qr-code');
+  qrWrap.innerHTML = '';
+  if (member.credentialQRData) {
+    try {
+      new QRCode(qrWrap, {
+        text: member.credentialQRData,
+        width: 72, height: 72,
+        colorDark: '#000000', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    } catch(e) {}
+  }
+
+  // Barcode
+  try {
+    JsBarcode('#badge-barcode', member.credentialId || 'SA000000', {
+      format: 'CODE128',
+      lineColor: '#ffffff',
+      background: 'transparent',
+      width: 1.5, height: 36,
+      displayValue: false,
+    });
+  } catch(e) {}
+
+  // Member info
+  const infoEl = document.getElementById('member-detail-info');
+  infoEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      ${infoRow('Nome', member.name)}
+      ${infoRow('Função', member.role || '—')}
+      ${infoRow('Acesso', member.access)}
+      ${infoRow('Credencial', member.credentialId)}
+      ${member.email ? infoRow('Email', member.email) : ''}
+      ${member.phone ? infoRow('Telefone', member.phone) : ''}
+      ${member.notes ? `<div style="grid-column:1/-1">${infoRow('Notas', member.notes)}</div>` : ''}
+    </div>
+  `;
+}
+
+function infoRow(label, value) {
+  return `<div>
+    <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">${label}</div>
+    <div style="font-size:13px;color:var(--text);font-weight:600">${esc(value)}</div>
+  </div>`;
+}
+
+async function downloadBadgeImage() {
+  const badge = document.getElementById('credential-badge');
+  const member = state.staff.find(s => s.id === currentMemberId);
+  try {
+    const canvas = await html2canvas(badge, {
+      backgroundColor: null, scale: 3, useCORS: true, allowTaint: true,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = `credential-${(member.name||'badge').replace(/\s+/g,'-')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('Imagem guardada!', 'success');
+  } catch(e) {
+    toast('Erro ao exportar', 'error');
+  }
+}
+
+function printBadge() {
+  const badge = document.getElementById('credential-badge');
+  const printArea = document.getElementById('print-area');
+  printArea.innerHTML = `<style>
+    body{display:flex;justify-content:center;padding:40px;background:#fff;}
+    #print-area{display:block!important;}
+  </style>${badge.outerHTML}`;
+  window.print();
+}
+
+function shareCredential() {
+  const member = state.staff.find(s => s.id === currentMemberId);
+  if (navigator.share) {
+    navigator.share({ title: 'Stage Access - ' + (member ? member.name : ''), text: `Credencial: ${member ? member.credentialId : ''}` });
+  } else {
+    const cred = member ? member.credentialId : '';
+    navigator.clipboard.writeText(cred).then(() => toast('ID copiado: ' + cred));
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  SESSION QR
+// ════════════════════════════════════════════════════════
+function openSessionQR() {
+  generateSessionQR();
+  openModal('modal-session-qr');
+}
+
+function generateSessionQR() {
+  const ev = state.events.find(e => e.id === currentEventId);
+  if (!ev) return;
+  const container = document.getElementById('session-qr-container');
+  container.innerHTML = '';
+  const payload = JSON.stringify({
+    type: 'stage-access-session',
+    eventId: ev.id,
+    eventName: ev.name,
+    token: ev.sessionToken,
+    role: 'admin-check',
+    issued: Date.now(),
+  });
+  try {
+    new QRCode(container, {
+      text: payload,
+      width: 200, height: 200,
+      colorDark: '#000', colorLight: '#fff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch(e) {}
+}
+
+function refreshSessionQR() {
+  const ev = state.events.find(e => e.id === currentEventId);
+  if (!ev) return;
+  ev.sessionToken = uid();
+  saveDB();
+  generateSessionQR();
+  toast('QR regenerado');
+}
+
+// ════════════════════════════════════════════════════════
+//  ADMIN CHECK — ENTRY SCANNER
+// ════════════════════════════════════════════════════════
+function startAdminCheck() {
+  showView('admin-check-entry');
+}
+
+function startEntryScanner() {
+  document.getElementById('start-entry-scan-btn').style.display = 'none';
+  if (entryHtml5QrCode) {
+    entryHtml5QrCode.stop().catch(()=>{});
+  }
+  entryHtml5QrCode = new Html5Qrcode('entry-qr-reader');
+  entryHtml5QrCode.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 250, height: 250 } },
+    (decodedText) => {
+      try {
+        const data = JSON.parse(decodedText);
+        if (data.type === 'stage-access-session' && data.role === 'admin-check') {
+          const ev = state.events.find(e => e.id === data.eventId && e.sessionToken === data.token);
+          if (ev) {
+            entryHtml5QrCode.stop().catch(()=>{});
+            currentEventId = ev.id;
+            launchScanner(ev);
+          } else {
+            toast('Sessão inválida ou expirada', 'error');
+          }
+        }
+      } catch(e) {}
+    },
+    () => {}
+  ).catch(err => {
+    toast('Erro ao aceder à câmara: ' + err, 'error');
+    document.getElementById('start-entry-scan-btn').style.display = '';
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  ADMIN CHECK — CREDENTIAL SCANNER
+// ════════════════════════════════════════════════════════
+function launchScanner(ev) {
+  scanOkCount = 0; scanErrCount = 0;
+  document.getElementById('scan-count-ok').textContent = '0';
+  document.getElementById('scan-count-err').textContent = '0';
+  document.getElementById('scanner-event-name').textContent = ev.name;
+  showView('scanner', false);
+
+  setTimeout(() => {
+    if (scannerHtml5QrCode) scannerHtml5QrCode.stop().catch(()=>{});
+    scannerHtml5QrCode = new Html5Qrcode('qr-reader');
+    scannerHtml5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 260, height: 260 } },
+      (decodedText) => {
+        handleCredentialScan(decodedText, ev);
+      },
+      () => {}
+    ).catch(err => toast('Erro câmara: ' + err, 'error'));
+  }, 300);
+}
+
+let scanCooldown = false;
+function handleCredentialScan(text, ev) {
+  if (scanCooldown) return;
+  scanCooldown = true;
+  setTimeout(() => scanCooldown = false, 2500);
+
+  try {
+    const data = JSON.parse(text);
+    if (data.type !== 'stage-access-credential') throw new Error('not-credential');
+
+    if (data.eventId !== ev.id) {
+      showScanResult('invalid', null, null, 'Credencial de outro evento');
+      return;
+    }
+
+    const member = state.staff.find(s => s.credentialId === data.credId && s.eventId === ev.id);
+    if (!member) {
+      showScanResult('invalid', data.name || '?', data.role || '', 'Credencial não encontrada');
+      return;
+    }
+
+    // Check duplicate
+    const alreadyIn = state.checkins.find(c => c.credentialId === data.credId && c.eventId === ev.id);
+    if (alreadyIn) {
+      const t = new Date(alreadyIn.ts).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
+      showScanResult('invalid', member.name, member.role, `Já entrou às ${t}`);
+      return;
+    }
+
+    // Valid!
+    state.checkins.push({ id: uid(), credentialId: data.credId, eventId: ev.id, ts: Date.now() });
+    saveDB();
+    scanOkCount++;
+    document.getElementById('scan-count-ok').textContent = scanOkCount;
+    showScanResult('valid', member.name, member.role, '✓ Entrada permitida', member.access, ev.name);
+  } catch(e) {
+    scanErrCount++;
+    document.getElementById('scan-count-err').textContent = scanErrCount;
+    showScanResult('invalid', null, null, 'QR inválido ou ilegível');
+  }
+}
+
+function showScanResult(type, name, role, msg, access, eventName) {
+  const overlay = document.getElementById('scan-result-overlay');
+  const card = document.getElementById('scan-result-card');
+  const icon = document.getElementById('scan-result-icon');
+
+  overlay.className = 'scan-result-overlay show ' + type;
+  card.className = 'scan-result-card ' + type;
+  icon.className = 'scan-icon ' + type;
+
+  if (type === 'valid') {
+    icon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+  } else {
+    icon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+  }
+
+  document.getElementById('scan-result-name').textContent = name || '—';
+  document.getElementById('scan-result-role').textContent = role || '';
+  document.getElementById('scan-result-event').textContent = eventName || '';
+  document.getElementById('scan-result-msg').textContent = msg || '';
+  document.getElementById('scan-result-msg').style.color = type === 'valid' ? 'var(--green)' : 'var(--red)';
+
+  const accessEl = document.getElementById('scan-result-access');
+  accessEl.textContent = access || '';
+  accessEl.style.display = access ? '' : 'none';
+}
+
+function dismissScanResult() {
+  document.getElementById('scan-result-overlay').className = 'scan-result-overlay';
+}
+
+function exitScanner() {
+  if (scannerHtml5QrCode) {
+    scannerHtml5QrCode.stop().catch(()=>{});
+    scannerHtml5QrCode = null;
+  }
+  document.getElementById('qr-reader').innerHTML = '';
+  showView('landing', false);
+}
+
+// ════════════════════════════════════════════════════════
+//  CSV IMPORT
+// ════════════════════════════════════════════════════════
+function openImportCSV() { openModal('modal-import-csv'); }
+
+function downloadCSVTemplate() {
+  const csv = 'nome,funcao,email,telefone,acesso\nJoão Silva,Production Manager,joao@email.com,+351912345678,All Access\nMaria Santos,Press,maria@media.pt,+351961234567,Press / Media\n';
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const link = document.createElement('a');
+  link.download = 'staff-template.csv';
+  link.href = URL.createObjectURL(blob);
+  link.click();
+}
+
+function handleCSVUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    const result = parseCSV(text);
+    const fb = document.getElementById('import-feedback');
+    if (result.error) {
+      fb.textContent = result.error;
+      fb.className = 'import-feedback show error';
+      return;
+    }
+    fb.textContent = `${result.count} membro(s) importado(s) com sucesso!`;
+    fb.className = 'import-feedback show success';
+    saveDB();
+    setTimeout(() => { closeModal('modal-import-csv'); renderEventDetail(); }, 1200);
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return { error: 'Ficheiro vazio ou sem dados' };
+
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const nameIdx = headers.findIndex(h => h.includes('nome') || h.includes('name'));
+  if (nameIdx < 0) return { error: 'Coluna "nome" não encontrada' };
+
+  const getCol = (row, ...keys) => {
+    const cells = row.split(',').map(c => c.trim().replace(/^"|"$/g,''));
+    for (const k of keys) {
+      const idx = headers.findIndex(h => h.includes(k));
+      if (idx >= 0) return cells[idx] || '';
+    }
+    return '';
+  };
+
+  let count = 0;
+  const ev = state.events.find(e => e.id === currentEventId);
+  const defaults = ['All Access', 'Backstage', 'Press / Media'];
+  const validAccess = [...defaults, ...(ev ? ev.customAccessTypes || [] : [])];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const name = getCol(line, 'nome', 'name');
+    if (!name) continue;
+    let access = getCol(line, 'acesso', 'access') || 'All Access';
+    if (!validAccess.includes(access)) access = 'All Access';
+
+    const credId = 'CRED-' + uid(8).toUpperCase();
+    const member = {
+      id: uid(),
+      eventId: currentEventId,
+      name,
+      role: getCol(line, 'func', 'role', 'cargo'),
+      email: getCol(line, 'email'),
+      phone: getCol(line, 'telef', 'phone', 'tel'),
+      notes: '',
+      access,
+      credentialId: credId,
+      credentialQRData: JSON.stringify({
+        type: 'stage-access-credential',
+        credId,
+        eventId: currentEventId,
+        name,
+        role: getCol(line, 'func', 'role', 'cargo'),
+        access,
+        issued: Date.now(),
+      }),
+      createdAt: Date.now(),
+    };
+    state.staff.push(member);
+    count++;
+  }
+  return { count };
+}
+
+// ════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════
+function uid(len = 12) {
+  return Math.random().toString(36).slice(2, 2 + len) + Math.random().toString(36).slice(2, 2 + len).slice(0, Math.max(0, len - 10));
+}
+
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function accessBadgeClass(access) {
+  if (!access) return 'badge-gray';
+  const a = access.toLowerCase();
+  if (a.includes('all')) return 'badge-gold';
+  if (a.includes('back')) return 'badge-purple';
+  if (a.includes('press') || a.includes('media')) return 'badge-blue';
+  return 'badge-gray';
+}
+
+function accessBg(access) {
+  const a = (access||'').toLowerCase();
+  if (a.includes('all')) return 'rgba(201,168,76,0.15)';
+  if (a.includes('back')) return 'rgba(136,85,204,0.15)';
+  if (a.includes('press') || a.includes('media')) return 'rgba(85,136,204,0.15)';
+  return 'var(--surface2)';
+}
+
+function accessFg(access) {
+  const a = (access||'').toLowerCase();
+  if (a.includes('all')) return 'var(--gold)';
+  if (a.includes('back')) return 'var(--purple)';
+  if (a.includes('press') || a.includes('media')) return 'var(--blue)';
+  return 'var(--text-muted)';
+}
+
+function isLightColor(hex) {
+  const c = hex.replace('#','');
+  const r = parseInt(c.substr(0,2),16);
+  const g = parseInt(c.substr(2,2),16);
+  const b = parseInt(c.substr(4,2),16);
+  return (r*299 + g*587 + b*114) / 1000 > 128;
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+loadDB();
+showView('landing', false);
+</script>
+</body>
+</html>
