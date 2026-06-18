@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Stage Access</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -508,6 +509,84 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 /* Custom scrollbar for modal */
 .modal::-webkit-scrollbar{width:4px;}
 .modal::-webkit-scrollbar-thumb{background:var(--border);}
+
+/* ── CREDENTIAL DESIGNER ── */
+#view-credential-designer{flex-direction:column;}
+.designer-layout{display:flex;flex:1;overflow:hidden;min-height:0;}
+.designer-sidebar{
+  width:164px;min-width:164px;
+  background:var(--surface);border-right:1px solid var(--border);
+  overflow-y:auto;padding:10px;display:flex;flex-direction:column;
+}
+.designer-center{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  background:#c8cde0;overflow:auto;padding:24px;
+}
+.designer-right{
+  width:176px;min-width:176px;
+  background:var(--surface);border-left:1px solid var(--border);
+  overflow-y:auto;padding:10px;
+}
+.tool-group-label{
+  font-size:9px;font-weight:800;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:1.5px;
+  padding:10px 2px 5px;
+}
+.tool-group-label:first-child{padding-top:2px;}
+.tool-btn{
+  display:flex;align-items:center;gap:7px;
+  width:100%;padding:8px 10px;margin-bottom:3px;
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--surface2);color:var(--text);
+  font-size:11px;font-weight:600;cursor:pointer;text-align:left;
+  transition:all .15s;white-space:nowrap;overflow:hidden;
+}
+.tool-btn:hover{border-color:#2259e0;color:#2259e0;background:rgba(34,89,224,.07);}
+.tool-btn svg{width:13px;height:13px;flex-shrink:0;}
+.tool-file{position:relative;overflow:hidden;}
+.tool-file input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;}
+.fabric-shadow{box-shadow:0 8px 40px rgba(0,0,0,.3);border-radius:12px;overflow:hidden;display:block;line-height:0;}
+.layer-row{
+  display:flex;align-items:center;gap:5px;
+  padding:6px 8px;border-radius:6px;border:1px solid transparent;
+  background:var(--surface2);margin-bottom:3px;cursor:pointer;font-size:11px;
+  transition:border-color .15s;
+}
+.layer-row:hover{border-color:var(--border);}
+.layer-row.sel{border-color:#2259e0;background:rgba(34,89,224,.08);}
+.layer-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);}
+.layer-acts{display:flex;gap:1px;flex-shrink:0;}
+.layer-acts button{
+  width:20px;height:20px;padding:0;border:none;background:none;
+  cursor:pointer;color:var(--text-dim);border-radius:3px;font-size:10px;
+  display:flex;align-items:center;justify-content:center;
+}
+.layer-acts button:hover{background:var(--border);color:var(--text);}
+.prop-row{margin-bottom:10px;}
+.prop-lbl{font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+.prop-inp{
+  width:100%;padding:5px 8px;border:1px solid var(--border);
+  border-radius:5px;font-size:11px;background:var(--surface2);
+  color:var(--text);outline:none;font-family:inherit;
+}
+.prop-inp:focus{border-color:#2259e0;}
+.prop-row input[type=range]{width:100%;accent-color:#2259e0;}
+.prop-row input[type=color]{width:100%;height:30px;border:1px solid var(--border);border-radius:5px;cursor:pointer;padding:2px;background:var(--surface2);}
+.designer-no-sel{font-size:11px;color:var(--text-dim);text-align:center;padding:20px 8px;line-height:1.6;}
+.placeholder-badge{
+  display:inline-flex;align-items:center;
+  padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;
+  background:rgba(34,89,224,.15);color:#2259e0;text-transform:uppercase;
+  letter-spacing:.5px;margin-left:4px;
+}
+.designer-hint{
+  font-size:10px;color:var(--text-dim);text-align:center;
+  padding:6px 8px;line-height:1.5;
+}
+@media(max-width:700px){
+  .designer-right{display:none;}
+  .designer-sidebar{width:130px;min-width:130px;}
+}
 </style>
 </head>
 <body>
@@ -707,6 +786,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         <div id="event-detail-artist" style="font-size:13px;font-weight:700;color:var(--gold)"></div>
         <div id="event-detail-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px"></div>
       </div>
+      <button class="btn btn-secondary btn-sm" onclick="openCredentialDesigner(currentEventId)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Designer
+      </button>
       <button class="btn btn-secondary btn-sm" onclick="openSessionQR()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
         QR Sessão
@@ -990,6 +1073,126 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       <p>Clica ou arrasta o ficheiro CSV</p>
     </label>
     <div class="import-feedback" id="import-feedback"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     CREDENTIAL DESIGNER
+══════════════════════════════════════════════ -->
+<div id="view-credential-designer" class="view">
+  <div class="topbar">
+    <button class="topbar-back" onclick="closeDesigner()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Voltar
+    </button>
+    <div class="topbar-title">Designer de Credencial</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="previewDesignerTemplate()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Preview
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="saveCredentialTemplate()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
+        Guardar
+      </button>
+    </div>
+  </div>
+  <div class="designer-layout">
+
+    <!-- LEFT SIDEBAR — Tools -->
+    <div class="designer-sidebar">
+      <div class="tool-group-label">Fundo</div>
+      <div class="tool-btn tool-file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Imagem fundo
+        <input type="file" accept="image/*" onchange="dsAddBgImage(this)">
+      </div>
+      <div class="tool-btn" onclick="dsPickBgColor()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 10s3-3 6-3 5 3 8 3 6-3 6-3v13s-3 3-6 3-5-3-8-3-6 3-6 3z"/></svg>
+        Cor de fundo
+      </div>
+      <input type="color" id="ds-bg-color" style="display:none" oninput="dsSetBgColor(this.value)" value="#1a2040">
+
+      <div class="tool-group-label">Imagens</div>
+      <div class="tool-btn tool-file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        + Imagem / Logo
+        <input type="file" accept="image/*" onchange="dsAddImage(this)">
+      </div>
+
+      <div class="tool-group-label">Texto</div>
+      <button class="tool-btn" onclick="dsAddText()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        + Texto livre
+      </button>
+
+      <div class="tool-group-label">Dados do membro</div>
+      <button class="tool-btn" onclick="dsAddPlaceholder('name')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        + Nome
+      </button>
+      <button class="tool-btn" onclick="dsAddPlaceholder('role')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        + Função
+      </button>
+      <button class="tool-btn" onclick="dsAddPlaceholder('access')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        + Acesso
+      </button>
+      <button class="tool-btn" onclick="dsAddPlaceholder('event')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        + Evento
+      </button>
+      <button class="tool-btn" onclick="dsAddPlaceholder('date')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        + Data
+      </button>
+
+      <div class="tool-group-label">Códigos</div>
+      <button class="tool-btn" onclick="dsAddQR()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        + QR Code
+      </button>
+      <button class="tool-btn" onclick="dsAddBarcode()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="4" y2="18"/><line x1="8" y1="6" x2="8" y2="18"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="16" y1="6" x2="16" y2="18"/><line x1="20" y1="6" x2="20" y2="18"/></svg>
+        + Código barras
+      </button>
+
+      <div class="tool-group-label">Canvas</div>
+      <button class="tool-btn" onclick="dsClearAll()" style="color:var(--red)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        Limpar tudo
+      </button>
+    </div>
+
+    <!-- CENTER — Fabric Canvas -->
+    <div class="designer-center" id="ds-canvas-area">
+      <div class="fabric-shadow" id="ds-canvas-wrap">
+        <canvas id="ds-fabric-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- RIGHT — Layers + Properties -->
+    <div class="designer-right">
+      <div class="tool-group-label" style="margin-top:0">Camadas</div>
+      <div id="ds-layers"></div>
+
+      <div class="tool-group-label" style="margin-top:14px">Propriedades</div>
+      <div id="ds-props">
+        <div class="designer-no-sel">Selecciona um elemento no canvas para editar.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal-overlay" id="modal-ds-preview">
+  <div class="modal" style="max-width:380px;text-align:center">
+    <button class="modal-close" onclick="closeModal('modal-ds-preview')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="modal-title">Preview da Credencial</div>
+    <div id="ds-preview-content" style="display:flex;flex-direction:column;align-items:center;gap:14px;"></div>
   </div>
 </div>
 
@@ -1560,11 +1763,39 @@ async function deleteCurrentMember() {
 // ════════════════════════════════════════════════════════
 //  CREDENTIAL / BADGE
 // ════════════════════════════════════════════════════════
-function renderCredential() {
+async function renderCredential() {
   const member = state.staff.find(s => s.id === currentMemberId);
   if (!member) { showView('event-detail'); return; }
   const ev = state.events.find(e => e.id === member.eventId);
   if (!ev) { showView('event-detail'); return; }
+
+  // If event has a designer template, use it
+  const staticBadge = document.getElementById('credential-badge');
+  const templatePreview = document.getElementById('credential-template-preview');
+
+  if (ev.credentialTemplate) {
+    staticBadge.style.display = 'none';
+    if (templatePreview) templatePreview.style.display = 'none';
+    showLoading('A gerar credencial…');
+    try {
+      const url = await generateCredentialImage(member, ev);
+      hideLoading();
+      if (url) {
+        let prev = document.getElementById('credential-template-preview');
+        if (!prev) {
+          prev = document.createElement('img');
+          prev.id = 'credential-template-preview';
+          prev.style.cssText = 'width:300px;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35);flex-shrink:0';
+          staticBadge.parentNode.insertBefore(prev, staticBadge);
+        }
+        prev.src = url;
+        prev.style.display = 'block';
+      }
+    } catch(e) { hideLoading(); staticBadge.style.display = ''; }
+  } else {
+    staticBadge.style.display = '';
+    if (templatePreview) templatePreview.style.display = 'none';
+  }
 
   const accent = ev.accentColor || '#2259e0';
   const badge = document.getElementById('credential-badge');
@@ -1637,21 +1868,34 @@ function infoRow(label, value) {
 }
 
 async function downloadBadgeImage() {
-  const badge = document.getElementById('credential-badge');
   const member = state.staff.find(s => s.id === currentMemberId);
+  const ev = member && state.events.find(e => e.id === member.eventId);
+
+  // Use template if available
+  if (ev && ev.credentialTemplate) {
+    showLoading('A gerar credencial…');
+    try {
+      const url = await generateCredentialImage(member, ev);
+      hideLoading();
+      if (url) {
+        const link = document.createElement('a');
+        link.download = `credential-${(member.name||'badge').replace(/\s+/g,'-')}.png`;
+        link.href = url; link.click();
+        toast('Imagem guardada!', 'success');
+        return;
+      }
+    } catch(e) { hideLoading(); }
+  }
+
+  // Fallback: html2canvas on static badge
+  const badge = document.getElementById('credential-badge');
   try {
-    const canvas = await html2canvas(badge, {
-      backgroundColor: null, scale: 3, useCORS: true, allowTaint: true,
-      logging: false,
-    });
+    const canvas = await html2canvas(badge, { backgroundColor:null, scale:3, useCORS:true, allowTaint:true, logging:false });
     const link = document.createElement('a');
     link.download = `credential-${(member.name||'badge').replace(/\s+/g,'-')}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    link.href = canvas.toDataURL('image/png'); link.click();
     toast('Imagem guardada!', 'success');
-  } catch(e) {
-    toast('Erro ao exportar', 'error');
-  }
+  } catch(e) { toast('Erro ao exportar', 'error'); }
 }
 
 function printBadge() {
@@ -2007,6 +2251,374 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
     if (e.target === overlay) overlay.classList.remove('open');
   });
 });
+
+// ════════════════════════════════════════════════════════
+//  CREDENTIAL DESIGNER (Fabric.js)
+// ════════════════════════════════════════════════════════
+const DS_W = 320, DS_H = 480;
+let ds = null; // fabric canvas
+let dsEventId = null;
+
+const DS_PH_LABELS = { name:'Nome da Pessoa', role:'Função / Cargo', access:'TIPO DE ACESSO', event:'Nome do Evento', date:'Data do Evento' };
+
+function openCredentialDesigner(evId) {
+  dsEventId = evId;
+  showView('credential-designer');
+  setTimeout(dsInit, 120);
+}
+
+function closeDesigner() {
+  dsDestroy();
+  document.removeEventListener('keydown', dsKeyHandler);
+  showView('event-detail');
+}
+
+function dsDestroy() {
+  if (ds) { try { ds.dispose(); } catch(e){} ds = null; }
+  const wrap = document.getElementById('ds-canvas-wrap');
+  if (wrap) wrap.innerHTML = '<canvas id="ds-fabric-canvas"></canvas>';
+}
+
+function dsInit() {
+  dsDestroy();
+  const ev = state.events.find(e => e.id === dsEventId);
+  const accent = ev ? (ev.accentColor || '#2259e0') : '#2259e0';
+
+  ds = new fabric.Canvas('ds-fabric-canvas', {
+    width: DS_W, height: DS_H,
+    backgroundColor: '#1a2040',
+    preserveObjectStacking: true,
+    selection: true,
+  });
+
+  if (ev && ev.credentialTemplate) {
+    ds.loadFromJSON(ev.credentialTemplate, () => {
+      ds.renderAll();
+      dsUpdateLayers();
+    });
+  } else {
+    // Default starter layout
+    dsDefaultLayout(ev, accent);
+  }
+
+  ds.on('object:modified', dsUpdateLayers);
+  ds.on('object:added', dsUpdateLayers);
+  ds.on('object:removed', dsUpdateLayers);
+  ds.on('selection:created', dsUpdateProps);
+  ds.on('selection:updated', dsUpdateProps);
+  ds.on('selection:cleared', () => {
+    document.getElementById('ds-props').innerHTML = '<div class="designer-no-sel">Selecciona um elemento no canvas.</div>';
+    dsUpdateLayers();
+  });
+  document.addEventListener('keydown', dsKeyHandler);
+}
+
+function dsDefaultLayout(ev, accent) {
+  // Background rect
+  const bg = new fabric.Rect({ width: DS_W, height: DS_H, left:0, top:0, fill: '#0d1030', selectable:false, evented:false, customType:'bg-rect' });
+  // Accent stripe bottom
+  const stripe = new fabric.Rect({ width: DS_W, height: 80, left:0, top: DS_H-80, fill: accent, selectable:true, customType:'stripe' });
+  // "STAGE ACCESS" top label
+  const saLabel = new fabric.Text('STAGE ACCESS', { left: DS_W/2, top: 18, fontSize:9, fill:'rgba(255,255,255,0.35)', fontFamily:'Arial', fontWeight:'700', letterSpacing:3, originX:'center', customType:'text' });
+  // Artist/event name
+  const artistTxt = new fabric.IText(ev ? (ev.artist || ev.name).toUpperCase() : 'NOME DO ARTISTA', { left: DS_W/2, top: 36, fontSize:22, fill:'#ffffff', fontFamily:'Arial', fontWeight:'800', originX:'center', textAlign:'center', customType:'text' });
+  // Placeholder: person name
+  const nameTxt = new fabric.IText(DS_PH_LABELS.name, { left: DS_W/2, top: DS_H-66, fontSize:16, fill:'#ffffff', fontFamily:'Arial', fontWeight:'700', originX:'center', textAlign:'center', customType:'placeholder', placeholder:'name' });
+  // Placeholder: access
+  const accessTxt = new fabric.IText(DS_PH_LABELS.access, { left: DS_W/2, top: DS_H-40, fontSize:12, fill:'rgba(255,255,255,0.75)', fontFamily:'Arial', fontWeight:'800', originX:'center', textAlign:'center', customType:'placeholder', placeholder:'access', letterSpacing:2 });
+
+  [bg, stripe, saLabel, artistTxt, nameTxt, accessTxt].forEach(o => ds.add(o));
+  ds.renderAll();
+  dsUpdateLayers();
+}
+
+function dsKeyHandler(e) {
+  if (!document.getElementById('view-credential-designer').classList.contains('active')) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'Delete' || e.key === 'Backspace') dsDeleteSelected();
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z') { ds.undo && ds.undo(); }
+}
+
+// ── TOOLS ──
+function dsAddBgImage(input) {
+  const f = input.files[0]; if (!f || !ds) return;
+  const r = new FileReader();
+  r.onload = e => {
+    fabric.Image.fromURL(e.target.result, img => {
+      const scale = Math.max(DS_W/img.width, DS_H/img.height);
+      img.set({ scaleX:scale, scaleY:scale, left:0, top:0, originX:'left', originY:'top', customType:'bg-image', selectable:true });
+      ds.add(img); ds.sendToBack(img); ds.setActiveObject(img); ds.renderAll(); dsUpdateLayers();
+    }, { crossOrigin:'anonymous' });
+  };
+  r.readAsDataURL(f); input.value='';
+}
+
+function dsPickBgColor() { document.getElementById('ds-bg-color').click(); }
+function dsSetBgColor(c) { if (!ds) return; ds.backgroundColor = c; ds.renderAll(); }
+
+function dsAddImage(input) {
+  const f = input.files[0]; if (!f || !ds) return;
+  const r = new FileReader();
+  r.onload = e => {
+    fabric.Image.fromURL(e.target.result, img => {
+      const maxS = 140;
+      if (img.width > maxS || img.height > maxS) { const s = maxS/Math.max(img.width,img.height); img.scale(s); }
+      img.set({ left:90, top:100, customType:'image' });
+      ds.add(img); ds.setActiveObject(img); ds.renderAll(); dsUpdateLayers();
+    }, { crossOrigin:'anonymous' });
+  };
+  r.readAsDataURL(f); input.value='';
+}
+
+function dsAddText() {
+  if (!ds) return;
+  const t = new fabric.IText('Texto aqui', { left:DS_W/2, top:200, fontSize:20, fill:'#ffffff', fontFamily:'Arial', fontWeight:'normal', originX:'center', customType:'text' });
+  ds.add(t); ds.setActiveObject(t); ds.renderAll(); dsUpdateLayers();
+}
+
+function dsAddPlaceholder(type) {
+  if (!ds) return;
+  const isBig = type === 'name' || type === 'access';
+  const t = new fabric.IText(DS_PH_LABELS[type] || type, {
+    left:DS_W/2, top:180, fontSize:isBig?20:13, fill:'#ffffff',
+    fontFamily:'Arial', fontWeight:isBig?'bold':'normal',
+    originX:'center', textAlign:'center',
+    customType:'placeholder', placeholder:type,
+  });
+  ds.add(t); ds.setActiveObject(t); ds.renderAll(); dsUpdateLayers();
+}
+
+function dsAddQR() {
+  if (!ds) return;
+  // Render a sample QR to get a data URL
+  const tmp = document.createElement('div'); tmp.style.display='none'; document.body.appendChild(tmp);
+  new QRCode(tmp, { text:'STAGE-ACCESS-QR-PREVIEW', width:80, height:80, colorDark:'#000', colorLight:'#fff' });
+  setTimeout(() => {
+    const img = tmp.querySelector('img');
+    const src = img ? img.src : null;
+    document.body.removeChild(tmp);
+    if (!src) return;
+    fabric.Image.fromURL(src, fImg => {
+      fImg.set({ left:DS_W/2-40, top:340, customType:'qr-placeholder', selectable:true });
+      ds.add(fImg); ds.setActiveObject(fImg); ds.renderAll(); dsUpdateLayers();
+    });
+  }, 300);
+}
+
+function dsAddBarcode() {
+  if (!ds) return;
+  const svgEl = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svgEl.setAttribute('id','ds-tmp-barcode');
+  document.body.appendChild(svgEl);
+  JsBarcode('#ds-tmp-barcode','SA-PREVIEW',{ format:'CODE128', lineColor:'#000', background:'#fff', width:1.5, height:40, displayValue:false });
+  const svgStr = new XMLSerializer().serializeToString(svgEl);
+  document.body.removeChild(svgEl);
+  const src = 'data:image/svg+xml;base64,'+btoa(svgStr);
+  fabric.Image.fromURL(src, fImg => {
+    fImg.set({ left:DS_W/2 - fImg.width/2, top:420, customType:'barcode-placeholder' });
+    ds.add(fImg); ds.setActiveObject(fImg); ds.renderAll(); dsUpdateLayers();
+  });
+}
+
+function dsClearAll() {
+  if (!ds || !confirm('Limpar todo o canvas?')) return;
+  ds.clear(); ds.backgroundColor='#1a2040'; ds.renderAll(); dsUpdateLayers();
+  document.getElementById('ds-props').innerHTML = '<div class="designer-no-sel">Selecciona um elemento no canvas.</div>';
+}
+
+// ── LAYERS ──
+function dsUpdateLayers() {
+  if (!ds) return;
+  const el = document.getElementById('ds-layers');
+  if (!el) return;
+  const objs = ds.getObjects().slice().reverse();
+  const active = ds.getActiveObject();
+  el.innerHTML = objs.map((o, i) => {
+    const realIdx = ds.getObjects().length - 1 - i;
+    const isSel = o === active;
+    return `<div class="layer-row ${isSel?'sel':''}" onclick="dsSelectByIdx(${realIdx})">
+      <span class="layer-name">${dsObjLabel(o)}</span>
+      <div class="layer-acts">
+        <button onclick="dsMoveUp(event,${realIdx})" title="Subir">↑</button>
+        <button onclick="dsMoveDown(event,${realIdx})" title="Descer">↓</button>
+        <button onclick="dsRemoveIdx(event,${realIdx})" title="Remover">✕</button>
+      </div>
+    </div>`;
+  }).join('') || '<div class="designer-hint">Nenhum elemento.</div>';
+}
+
+function dsObjLabel(o) {
+  const ph = { name:'👤 Nome', role:'💼 Função', access:'🛡 Acesso', event:'🎵 Evento', date:'📅 Data' };
+  if (o.placeholder && ph[o.placeholder]) return ph[o.placeholder];
+  if (o.customType === 'bg-image') return '🖼 Imagem fundo';
+  if (o.customType === 'bg-rect') return '⬛ Fundo';
+  if (o.customType === 'stripe') return '▬ Faixa';
+  if (o.customType === 'image') return '🖼 Imagem';
+  if (o.customType === 'qr-placeholder') return '⬛ QR Code';
+  if (o.customType === 'barcode-placeholder') return '▌ Código barras';
+  if (o.type === 'i-text' || o.type === 'text') return '✏ "' + (o.text||'').slice(0,14) + '"';
+  if (o.type === 'rect') return '▭ Rectângulo';
+  if (o.type === 'group') return '⬚ Grupo';
+  return '▪ ' + (o.type||'?');
+}
+
+function dsSelectByIdx(idx) {
+  if (!ds) return;
+  const o = ds.getObjects()[idx];
+  if (o) { ds.setActiveObject(o); ds.renderAll(); dsUpdateProps(); dsUpdateLayers(); }
+}
+
+function dsMoveUp(e, idx) {
+  e.stopPropagation(); if (!ds) return;
+  const o = ds.getObjects()[idx]; if (o) { ds.bringForward(o); ds.renderAll(); dsUpdateLayers(); }
+}
+function dsMoveDown(e, idx) {
+  e.stopPropagation(); if (!ds) return;
+  const o = ds.getObjects()[idx]; if (o) { ds.sendBackwards(o); ds.renderAll(); dsUpdateLayers(); }
+}
+function dsRemoveIdx(e, idx) {
+  e.stopPropagation(); if (!ds) return;
+  const o = ds.getObjects()[idx]; if (o) { ds.remove(o); ds.renderAll(); dsUpdateLayers(); }
+}
+function dsDeleteSelected() {
+  if (!ds) return;
+  const active = ds.getActiveObjects();
+  ds.discardActiveObject();
+  active.forEach(o => ds.remove(o));
+  ds.renderAll(); dsUpdateLayers();
+  document.getElementById('ds-props').innerHTML = '<div class="designer-no-sel">Selecciona um elemento no canvas.</div>';
+}
+
+// ── PROPERTIES ──
+function dsUpdateProps() {
+  if (!ds) return;
+  const o = ds.getActiveObject();
+  const panel = document.getElementById('ds-props');
+  if (!o) { panel.innerHTML = '<div class="designer-no-sel">Selecciona um elemento no canvas.</div>'; dsUpdateLayers(); return; }
+
+  const isText = o.type === 'i-text' || o.type === 'text';
+  const isImg = o.type === 'image';
+  const col = (typeof o.fill === 'string' && o.fill.startsWith('#')) ? o.fill : '#ffffff';
+  const opacity = Math.round((o.opacity||1)*100);
+  const ph = o.placeholder;
+
+  panel.innerHTML = `
+    ${ph ? `<div class="prop-row"><div class="prop-lbl">Campo automático</div><div style="font-size:11px;color:#2259e0;font-weight:700">${DS_PH_LABELS[ph]||ph}</div></div>` : ''}
+    ${isText ? `
+      <div class="prop-row">
+        <div class="prop-lbl">Texto</div>
+        <textarea class="prop-inp" rows="2" oninput="dsPropText(this.value)">${esc(o.text||'')}</textarea>
+      </div>
+      <div class="prop-row">
+        <div class="prop-lbl">Tamanho — <span id="fs-val">${o.fontSize||16}</span>px</div>
+        <input type="range" min="8" max="100" value="${o.fontSize||16}" oninput="dsPropFontSize(+this.value)">
+      </div>
+      <div class="prop-row">
+        <div class="prop-lbl">Cor do texto</div>
+        <input type="color" value="${col}" oninput="dsPropColor(this.value)">
+      </div>
+      <div class="prop-row" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="prop-bold" ${o.fontWeight==='bold'?'checked':''} onchange="dsPropBold(this.checked)">
+        <label for="prop-bold" style="font-size:11px;color:var(--text);cursor:pointer">Negrito</label>
+        <input type="checkbox" id="prop-italic" ${o.fontStyle==='italic'?'checked':''} onchange="dsPropItalic(this.checked)" style="margin-left:8px">
+        <label for="prop-italic" style="font-size:11px;color:var(--text);cursor:pointer">Itálico</label>
+      </div>
+      <div class="prop-row">
+        <div class="prop-lbl">Alinhamento</div>
+        <div style="display:flex;gap:4px">
+          ${['left','center','right'].map(a=>`<button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;padding:4px" onclick="dsPropAlign('${a}')">${a==='left'?'◀':a==='center'?'■':'▶'}</button>`).join('')}
+        </div>
+      </div>
+    ` : ''}
+    ${!isText && !isImg ? `
+      <div class="prop-row">
+        <div class="prop-lbl">Cor de preenchimento</div>
+        <input type="color" value="${col}" oninput="dsPropColor(this.value)">
+      </div>
+    ` : ''}
+    <div class="prop-row">
+      <div class="prop-lbl">Opacidade — <span id="op-val">${opacity}</span>%</div>
+      <input type="range" min="0" max="100" value="${opacity}" oninput="dsPropOpacity(+this.value)">
+    </div>
+    <div style="display:flex;gap:5px;margin-top:6px">
+      <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px" onclick="ds.bringForward(ds.getActiveObject());ds.renderAll();dsUpdateLayers()">↑ Frente</button>
+      <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px" onclick="ds.sendBackwards(ds.getActiveObject());ds.renderAll();dsUpdateLayers()">↓ Trás</button>
+    </div>
+    <button class="btn btn-danger btn-sm btn-full" style="margin-top:6px;font-size:11px" onclick="dsDeleteSelected()">Eliminar elemento</button>
+  `;
+  dsUpdateLayers();
+}
+
+function dsPropText(v) { const o=ds&&ds.getActiveObject(); if(o&&(o.type==='i-text'||o.type==='text')){o.set('text',v);ds.renderAll();} }
+function dsPropFontSize(v) { const o=ds&&ds.getActiveObject(); if(o){o.set('fontSize',v);const el=document.getElementById('fs-val');if(el)el.textContent=v;ds.renderAll();} }
+function dsPropColor(v) { const o=ds&&ds.getActiveObject(); if(o){o.set('fill',v);ds.renderAll();} }
+function dsPropBold(v) { const o=ds&&ds.getActiveObject(); if(o){o.set('fontWeight',v?'bold':'normal');ds.renderAll();} }
+function dsPropItalic(v) { const o=ds&&ds.getActiveObject(); if(o){o.set('fontStyle',v?'italic':'normal');ds.renderAll();} }
+function dsPropAlign(v) { const o=ds&&ds.getActiveObject(); if(o){o.set('textAlign',v);ds.renderAll();} }
+function dsPropOpacity(v) { const o=ds&&ds.getActiveObject(); if(o){o.set('opacity',v/100);const el=document.getElementById('op-val');if(el)el.textContent=v;ds.renderAll();} }
+
+// ── SAVE ──
+async function saveCredentialTemplate() {
+  if (!ds) return;
+  const ev = state.events.find(e => e.id === dsEventId);
+  if (!ev) return;
+  const json = ds.toJSON(['customType','placeholder']);
+  ev.credentialTemplate = json;
+  showLoading('A guardar template…');
+  try { await upsertEvent(ev); toast('Template guardado!', 'success'); }
+  catch(e) { toast('Erro ao guardar','error'); }
+  hideLoading();
+}
+
+// ── PREVIEW ──
+function previewDesignerTemplate() {
+  if (!ds) return;
+  const dataURL = ds.toDataURL({ multiplier:2, format:'png' });
+  const content = document.getElementById('ds-preview-content');
+  content.innerHTML = `<img src="${dataURL}" style="width:280px;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+    <button class="btn btn-primary" onclick="dsDownloadPreview('${dataURL}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Descarregar PNG
+    </button>`;
+  openModal('modal-ds-preview');
+}
+
+function dsDownloadPreview(url) {
+  const link = document.createElement('a');
+  link.download = 'credential-template.png';
+  link.href = url; link.click();
+}
+
+// ── GENERATE INDIVIDUAL CREDENTIAL FROM TEMPLATE ──
+async function generateCredentialImage(member, ev) {
+  const template = ev && ev.credentialTemplate;
+  if (!template) return null;
+
+  return new Promise(resolve => {
+    const tmpEl = document.createElement('canvas');
+    tmpEl.id = 'tmp-gen-canvas'; tmpEl.style.display='none'; document.body.appendChild(tmpEl);
+    const tmpFab = new fabric.Canvas(tmpEl, { width:DS_W, height:DS_H });
+    tmpFab.loadFromJSON(template, () => {
+      tmpFab.getObjects().forEach(o => {
+        if (!o.placeholder) return;
+        let val = '';
+        switch(o.placeholder) {
+          case 'name': val = member.name; break;
+          case 'role': val = member.role||''; break;
+          case 'access': val = member.access; break;
+          case 'event': val = ev.name; break;
+          case 'date': val = ev.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'}) : ''; break;
+        }
+        o.set('text', val);
+      });
+      tmpFab.renderAll();
+      const url = tmpFab.toDataURL({ multiplier:2, format:'png' });
+      tmpFab.dispose();
+      document.body.removeChild(tmpEl);
+      resolve(url);
+    });
+  });
+}
 
 // ════════════════════════════════════════════════════════
 //  INIT
