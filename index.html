@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Stage Access</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1007,14 +1008,43 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 
 <script>
 // ════════════════════════════════════════════════════════
-//  STATE
+//  SUPABASE
 // ════════════════════════════════════════════════════════
-const DB_KEY = 'stage-access-db';
-let state = {
-  events: [],
-  staff: [],
-  checkins: [],
-};
+const SUPA_URL = 'https://ykqaqsbhqyhprciftrdj.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcWFxc2JocXlocHJjaWZ0cmRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDE1MzAsImV4cCI6MjA5NzM3NzUzMH0.UNtn9P0u5YqerYOj1iVUSzFOk3H_LQEvPNFQEDNRwmA';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ── DB ↔ JS mappers ──
+const fromDBEvent = r => ({
+  id: r.id, name: r.name, date: r.date, venue: r.venue, artist: r.artist,
+  accentColor: r.accent_color, eventLogoData: r.event_logo_data,
+  artistLogoData: r.artist_logo_data, customAccessTypes: r.custom_access_types || [],
+  sessionToken: r.session_token, createdAt: r.created_at,
+});
+const toDBEvent = ev => ({
+  id: ev.id, name: ev.name, date: ev.date || null, venue: ev.venue || null,
+  artist: ev.artist || null, accent_color: ev.accentColor || '#c9a84c',
+  event_logo_data: ev.eventLogoData || null, artist_logo_data: ev.artistLogoData || null,
+  custom_access_types: ev.customAccessTypes || [], session_token: ev.sessionToken,
+  created_at: ev.createdAt || Date.now(),
+});
+const fromDBStaff = r => ({
+  id: r.id, eventId: r.event_id, name: r.name, role: r.role, email: r.email,
+  phone: r.phone, notes: r.notes, access: r.access, credentialId: r.credential_id,
+  credentialQRData: r.credential_qr_data, createdAt: r.created_at,
+});
+const toDBStaff = m => ({
+  id: m.id, event_id: m.eventId, name: m.name, role: m.role || null,
+  email: m.email || null, phone: m.phone || null, notes: m.notes || null,
+  access: m.access, credential_id: m.credentialId || null,
+  credential_qr_data: m.credentialQRData || null, created_at: m.createdAt || Date.now(),
+});
+const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: r.event_id, ts: r.ts });
+
+// ════════════════════════════════════════════════════════
+//  STATE (in-memory cache)
+// ════════════════════════════════════════════════════════
+let state = { events: [], staff: [], checkins: [] };
 let currentEventId = null;
 let currentMemberId = null;
 let editingEventId = null;
@@ -1024,18 +1054,92 @@ let scannerHtml5QrCode = null;
 let scanOkCount = 0;
 let scanErrCount = 0;
 let viewStack = [];
+let realtimeSub = null;
 
 // ════════════════════════════════════════════════════════
-//  PERSISTENCE
+//  LOADING OVERLAY
 // ════════════════════════════════════════════════════════
-function saveDB() {
-  try { localStorage.setItem(DB_KEY, JSON.stringify(state)); } catch(e) {}
+function showLoading(msg = 'A carregar…') {
+  let el = document.getElementById('loading-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loading-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(10,10,12,.75);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9000;gap:16px;backdrop-filter:blur(4px)';
+    el.innerHTML = '<div class="spinner" style="width:36px;height:36px;border-width:3px"></div><div style="font-size:13px;color:var(--text-muted)">' + msg + '</div>';
+    document.body.appendChild(el);
+  }
+  el.style.display = 'flex';
 }
-function loadDB() {
+function hideLoading() {
+  const el = document.getElementById('loading-overlay');
+  if (el) el.style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════
+//  DATA LAYER
+// ════════════════════════════════════════════════════════
+async function loadDB() {
+  showLoading('A ligar à base de dados…');
   try {
-    const raw = localStorage.getItem(DB_KEY);
-    if (raw) state = JSON.parse(raw);
-  } catch(e) {}
+    const [evRes, stRes, ckRes] = await Promise.all([
+      db.from('events').select('*').order('created_at', { ascending: false }),
+      db.from('staff').select('*').order('created_at', { ascending: true }),
+      db.from('checkins').select('*').order('ts', { ascending: false }),
+    ]);
+    state.events = (evRes.data || []).map(fromDBEvent);
+    state.staff = (stRes.data || []).map(fromDBStaff);
+    state.checkins = (ckRes.data || []).map(fromDBCheckin);
+  } catch(e) {
+    toast('Erro a ligar ao Supabase', 'error');
+  }
+  hideLoading();
+}
+
+async function upsertEvent(ev) {
+  const { error } = await db.from('events').upsert(toDBEvent(ev));
+  if (error) throw error;
+  const idx = state.events.findIndex(e => e.id === ev.id);
+  if (idx >= 0) state.events[idx] = ev; else state.events.unshift(ev);
+}
+
+async function upsertStaff(m) {
+  const { error } = await db.from('staff').upsert(toDBStaff(m));
+  if (error) throw error;
+  const idx = state.staff.findIndex(s => s.id === m.id);
+  if (idx >= 0) state.staff[idx] = m; else state.staff.push(m);
+}
+
+async function deleteStaffById(id) {
+  const { error } = await db.from('staff').delete().eq('id', id);
+  if (error) throw error;
+  state.staff = state.staff.filter(s => s.id !== id);
+}
+
+async function insertCheckin(ck) {
+  const { error } = await db.from('checkins').insert({
+    id: ck.id, credential_id: ck.credentialId, event_id: ck.eventId, ts: ck.ts,
+  });
+  if (error) throw error;
+  state.checkins.unshift(ck);
+}
+
+async function deleteCheckinsByEvent(eventId) {
+  const { error } = await db.from('checkins').delete().eq('event_id', eventId);
+  if (error) throw error;
+  state.checkins = state.checkins.filter(c => c.eventId !== eventId);
+}
+
+// Real-time checkins subscription (for Master watching event detail)
+function subscribeCheckins(eventId) {
+  if (realtimeSub) { db.removeChannel(realtimeSub); realtimeSub = null; }
+  realtimeSub = db.channel('checkins-' + eventId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checkins', filter: 'event_id=eq.' + eventId },
+      payload => {
+        const ck = fromDBCheckin(payload.new);
+        if (!state.checkins.find(c => c.id === ck.id)) state.checkins.unshift(ck);
+        if (document.getElementById('view-event-detail').classList.contains('active')) renderEventDetail();
+      })
+    .subscribe();
 }
 
 // ════════════════════════════════════════════════════════
@@ -1207,10 +1311,11 @@ function removeAccessType(i) {
   renderAccessTypesList();
 }
 
-function saveEvent() {
+async function saveEvent() {
   const name = document.getElementById('ev-name').value.trim();
   if (!name) { toast('Nome do evento obrigatório', 'error'); return; }
 
+  const existing = editingEventId ? state.events.find(e=>e.id===editingEventId) : null;
   const ev = {
     id: editingEventId || uid(),
     name,
@@ -1221,22 +1326,21 @@ function saveEvent() {
     eventLogoData: tempEventLogoData,
     artistLogoData: tempArtistLogoData,
     customAccessTypes: [...customAccessTypes],
-    sessionToken: editingEventId ? (state.events.find(e=>e.id===editingEventId)||{}).sessionToken || uid() : uid(),
-    createdAt: editingEventId ? (state.events.find(e=>e.id===editingEventId)||{}).createdAt || Date.now() : Date.now(),
+    sessionToken: existing ? existing.sessionToken : uid(),
+    createdAt: existing ? existing.createdAt : Date.now(),
   };
 
-  if (editingEventId) {
-    const idx = state.events.findIndex(e=>e.id===editingEventId);
-    if (idx >= 0) state.events[idx] = ev;
-  } else {
-    state.events.push(ev);
+  showLoading('A guardar evento…');
+  try {
+    await upsertEvent(ev);
+    editingEventId = null;
+    currentEventId = ev.id;
+    toast('Evento guardado!', 'success');
+    showView('event-detail');
+  } catch(e) {
+    toast('Erro ao guardar evento', 'error');
   }
-
-  saveDB();
-  editingEventId = null;
-  currentEventId = ev.id;
-  toast(editingEventId ? 'Evento actualizado' : 'Evento criado!', 'success');
-  showView('event-detail');
+  hideLoading();
 }
 
 function editCurrentEvent() {
@@ -1250,6 +1354,7 @@ function editCurrentEvent() {
 function renderEventDetail() {
   const ev = state.events.find(e => e.id === currentEventId);
   if (!ev) { showView('dashboard'); return; }
+  subscribeCheckins(currentEventId);
 
   document.getElementById('event-detail-name').textContent = ev.name;
   document.getElementById('event-detail-artist').textContent = ev.artist || ev.name;
@@ -1340,12 +1445,15 @@ function switchTab(tab, btn) {
   document.getElementById('tab-checkins').style.display = tab === 'checkins' ? '' : 'none';
 }
 
-function clearCheckins() {
+async function clearCheckins() {
   if (!confirm('Limpar todos os check-ins deste evento?')) return;
-  state.checkins = state.checkins.filter(c => c.eventId !== currentEventId);
-  saveDB();
-  renderEventDetail();
-  toast('Check-ins limpos', 'success');
+  showLoading('A limpar…');
+  try {
+    await deleteCheckinsByEvent(currentEventId);
+    renderEventDetail();
+    toast('Check-ins limpos', 'success');
+  } catch(e) { toast('Erro ao limpar', 'error'); }
+  hideLoading();
 }
 
 // ════════════════════════════════════════════════════════
@@ -1375,7 +1483,7 @@ function initAddStaffForm() {
   if (m) document.getElementById('staff-access').value = m.access;
 }
 
-function saveMember() {
+async function saveMember() {
   const name = document.getElementById('staff-name').value.trim();
   const access = document.getElementById('staff-access').value;
   if (!name) { toast('Nome obrigatório', 'error'); return; }
@@ -1398,14 +1506,9 @@ function saveMember() {
     createdAt: existing ? existing.createdAt : Date.now(),
   };
 
-  if (editingMemberId) {
-    const idx = state.staff.findIndex(s => s.id === editingMemberId);
-    if (idx >= 0) state.staff[idx] = member;
-    editingMemberId = null;
-  } else {
-    // Auto-generate credential
+  if (!editingMemberId) {
     member.credentialId = 'CRED-' + uid(8).toUpperCase();
-    const qrPayload = JSON.stringify({
+    member.credentialQRData = JSON.stringify({
       type: 'stage-access-credential',
       credId: member.credentialId,
       eventId: currentEventId,
@@ -1414,14 +1517,17 @@ function saveMember() {
       access: member.access,
       issued: Date.now(),
     });
-    member.credentialQRData = qrPayload;
-    state.staff.push(member);
   }
 
-  saveDB();
-  currentMemberId = member.id;
-  toast('Membro guardado!', 'success');
-  showView('credential');
+  showLoading('A guardar membro…');
+  try {
+    await upsertStaff(member);
+    editingMemberId = null;
+    currentMemberId = member.id;
+    toast('Membro guardado!', 'success');
+    showView('credential');
+  } catch(e) { toast('Erro ao guardar membro', 'error'); }
+  hideLoading();
 }
 
 function openMember(id) {
@@ -1435,17 +1541,16 @@ function editCurrentMember() {
   showView('add-staff');
 }
 
-function deleteCurrentMember() {
+async function deleteCurrentMember() {
   if (!confirm('Eliminar este membro e a sua credencial?')) return;
-  state.staff = state.staff.filter(s => s.id !== currentMemberId);
-  state.checkins = state.checkins.filter(c => {
-    const m = state.staff.find(s => s.id === currentMemberId);
-    return m ? c.credentialId !== m.credentialId : true;
-  });
-  saveDB();
-  currentMemberId = null;
-  toast('Membro eliminado');
-  showView('event-detail');
+  showLoading('A eliminar…');
+  try {
+    await deleteStaffById(currentMemberId);
+    currentMemberId = null;
+    toast('Membro eliminado');
+    showView('event-detail');
+  } catch(e) { toast('Erro ao eliminar', 'error'); }
+  hideLoading();
 }
 
 // ════════════════════════════════════════════════════════
@@ -1596,11 +1701,11 @@ function generateSessionQR() {
   } catch(e) {}
 }
 
-function refreshSessionQR() {
+async function refreshSessionQR() {
   const ev = state.events.find(e => e.id === currentEventId);
   if (!ev) return;
   ev.sessionToken = uid();
-  saveDB();
+  try { await upsertEvent(ev); } catch(e) {}
   generateSessionQR();
   toast('QR regenerado');
 }
@@ -1697,8 +1802,8 @@ function handleCredentialScan(text, ev) {
     }
 
     // Valid!
-    state.checkins.push({ id: uid(), credentialId: data.credId, eventId: ev.id, ts: Date.now() });
-    saveDB();
+    const ck = { id: uid(), credentialId: data.credId, eventId: ev.id, ts: Date.now() };
+    insertCheckin(ck).catch(()=>{});
     scanOkCount++;
     document.getElementById('scan-count-ok').textContent = scanOkCount;
     showScanResult('valid', member.name, member.role, '✓ Entrada permitida', member.access, ev.name);
@@ -1766,7 +1871,7 @@ function handleCSVUpload(input) {
   const file = input.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     const text = e.target.result;
     const result = parseCSV(text);
     const fb = document.getElementById('import-feedback');
@@ -1775,10 +1880,17 @@ function handleCSVUpload(input) {
       fb.className = 'import-feedback show error';
       return;
     }
-    fb.textContent = `${result.count} membro(s) importado(s) com sucesso!`;
-    fb.className = 'import-feedback show success';
-    saveDB();
-    setTimeout(() => { closeModal('modal-import-csv'); renderEventDetail(); }, 1200);
+    showLoading(`A importar ${result.members.length} membros…`);
+    try {
+      for (const m of result.members) await upsertStaff(m);
+      fb.textContent = `${result.members.length} membro(s) importado(s) com sucesso!`;
+      fb.className = 'import-feedback show success';
+      setTimeout(() => { closeModal('modal-import-csv'); renderEventDetail(); }, 1200);
+    } catch(err) {
+      fb.textContent = 'Erro ao importar: ' + err.message;
+      fb.className = 'import-feedback show error';
+    }
+    hideLoading();
   };
   reader.readAsText(file);
 }
@@ -1800,7 +1912,7 @@ function parseCSV(text) {
     return '';
   };
 
-  let count = 0;
+  const members = [];
   const ev = state.events.find(e => e.id === currentEventId);
   const defaults = ['All Access', 'Backstage', 'Press / Media'];
   const validAccess = [...defaults, ...(ev ? ev.customAccessTypes || [] : [])];
@@ -1835,10 +1947,9 @@ function parseCSV(text) {
       }),
       createdAt: Date.now(),
     };
-    state.staff.push(member);
-    count++;
+    members.push(member);
   }
-  return { count };
+  return { members };
 }
 
 // ════════════════════════════════════════════════════════
@@ -1896,8 +2007,10 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 // ════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════
-loadDB();
-showView('landing', false);
+(async () => {
+  await loadDB();
+  showView('landing', false);
+})();
 </script>
 </body>
 </html>
