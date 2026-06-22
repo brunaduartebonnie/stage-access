@@ -494,6 +494,44 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 .checkin-item-time{font-size:11px;color:var(--text-muted);}
 .checkin-item-access{font-size:11px;color:var(--gold);}
 
+/* ── STAFF GROUPS & CARDS ── */
+.staff-group{margin-bottom:20px;}
+.staff-group-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 4px 8px;
+  border-bottom:2px solid var(--blue);
+  margin-bottom:10px;
+}
+.staff-group-label{font-size:13px;font-weight:700;color:var(--blue);letter-spacing:.5px;text-transform:uppercase;}
+.staff-group-count{font-size:11px;font-weight:700;background:var(--blue);color:#fff;border-radius:20px;padding:2px 8px;}
+
+.staff-card{
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:var(--radius);padding:12px 14px;
+  margin-bottom:8px;cursor:pointer;transition:border-color .15s,box-shadow .15s;
+}
+.staff-card:hover{border-color:rgba(34,89,224,0.4);box-shadow:0 2px 12px rgba(34,89,224,0.08);}
+.staff-card-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.staff-card-avatar{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;
+}
+.staff-card-info{flex:1;min-width:0;}
+.staff-card-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.staff-card-meta{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;}
+.staff-meta-row{display:flex;align-items:baseline;gap:6px;}
+.staff-meta-lbl{font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;min-width:52px;flex-shrink:0;}
+.staff-meta-val{font-size:12px;color:var(--text-muted);}
+.staff-meta-val.mono{font-family:monospace;font-size:11px;color:var(--text);letter-spacing:.5px;}
+
+.staff-card-barcode{
+  background:var(--surface2);border-radius:6px;
+  padding:6px 10px;margin-top:4px;
+  border:1px solid var(--border);
+}
+
 /* ── IMPORT FEEDBACK ── */
 .import-feedback{
   padding:12px 16px;border-radius:var(--radius-sm);
@@ -904,6 +942,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         </select>
       </div>
       <div class="form-group">
+        <label class="form-label">Dias com acesso</label>
+        <div id="staff-days-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+          <!-- populated by JS -->
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Horário</label>
+        <input id="staff-schedule" class="form-input" type="text" placeholder="Ex: 10:00 – 23:00 ou Durante todo o evento">
+      </div>
+      <div class="form-group">
         <label class="form-label">Notas</label>
         <textarea id="staff-notes" class="form-textarea" placeholder="Informação adicional..."></textarea>
       </div>
@@ -1242,12 +1290,14 @@ const fromDBStaff = r => ({
   id: r.id, eventId: r.event_id, name: r.name, role: r.role, email: r.email,
   phone: r.phone, notes: r.notes, access: r.access, credentialId: r.credential_id,
   credentialQRData: r.credential_qr_data, createdAt: r.created_at,
+  days: r.days || [], schedule: r.schedule || '', issuedAt: r.issued_at || null,
 });
 const toDBStaff = m => ({
   id: m.id, event_id: m.eventId, name: m.name, role: m.role || null,
   email: m.email || null, phone: m.phone || null, notes: m.notes || null,
   access: m.access, credential_id: m.credentialId || null,
   credential_qr_data: m.credentialQRData || null, created_at: m.createdAt || Date.now(),
+  days: m.days || [], schedule: m.schedule || null, issued_at: m.issuedAt || null,
 });
 const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: r.event_id, ts: r.ts });
 
@@ -1587,6 +1637,7 @@ function renderEventDetail() {
   document.getElementById('stat-checkins').textContent = checkins.length;
 
   renderStaffList(members);
+  setTimeout(() => renderStaffBarcodes(members), 80);
   renderCheckinsList(checkins, members);
 
   // Populate access types select
@@ -1602,23 +1653,95 @@ function renderStaffList(members) {
     </div>`;
     return;
   }
-  list.innerHTML = members.map(m => {
-    const accessColor = accessBadgeClass(m.access);
-    return `<div class="list-item" onclick="openMember('${m.id}')">
-      <div class="list-item-avatar" style="background:${accessBg(m.access)};color:${accessFg(m.access)}">
-        ${m.name ? m.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase() : '?'}
+
+  // Group by role (empty role → "Sem Função")
+  const groups = {};
+  members.forEach(m => {
+    const key = m.role && m.role.trim() ? m.role.trim() : 'Sem Função';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(m);
+  });
+
+  const sortedGroups = Object.keys(groups).sort((a,b) => a === 'Sem Função' ? 1 : b === 'Sem Função' ? -1 : a.localeCompare(b));
+
+  list.innerHTML = sortedGroups.map(role => {
+    const gMembers = groups[role];
+    return `
+      <div class="staff-group">
+        <div class="staff-group-header">
+          <span class="staff-group-label">${esc(role)}</span>
+          <span class="staff-group-count">${gMembers.length}</span>
+        </div>
+        ${gMembers.map(m => renderStaffCard(m)).join('')}
       </div>
-      <div class="list-item-body">
-        <div class="list-item-name">${esc(m.name)}</div>
-        <div class="list-item-sub">${esc(m.role||'—')}</div>
-      </div>
-      <div class="list-item-right">
-        <span class="badge ${accessColor}">${esc(m.access||'—')}</span>
-        ${m.credentialId ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:var(--green)" title="Credencial emitida"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-    </div>`;
+    `;
   }).join('');
+}
+
+function renderStaffCard(m) {
+  const issuedStr = m.issuedAt
+    ? new Date(m.issuedAt).toLocaleDateString('pt-PT', {day:'2-digit',month:'short',year:'numeric'}) + ' ' +
+      new Date(m.issuedAt).toLocaleTimeString('pt-PT', {hour:'2-digit',minute:'2-digit'})
+    : null;
+  const daysStr = m.days && m.days.length ? m.days.join(' · ') : null;
+
+  // Mini barcode SVG via JsBarcode (rendered after insert)
+  const bcId = 'bc-mini-' + m.id;
+
+  return `<div class="staff-card" onclick="openMember('${m.id}')">
+    <div class="staff-card-top">
+      <div class="staff-card-avatar" style="background:${accessBg(m.access)};color:${accessFg(m.access)}">
+        ${m.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}
+      </div>
+      <div class="staff-card-info">
+        <div class="staff-card-name">${esc(m.name)}</div>
+        <span class="badge ${accessBadgeClass(m.access)}">${esc(m.access||'—')}</span>
+      </div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+
+    <div class="staff-card-meta">
+      ${m.credentialId ? `
+        <div class="staff-meta-row">
+          <span class="staff-meta-lbl">Código</span>
+          <span class="staff-meta-val mono">${esc(m.credentialId)}</span>
+        </div>` : ''}
+      ${issuedStr ? `
+        <div class="staff-meta-row">
+          <span class="staff-meta-lbl">Emitido</span>
+          <span class="staff-meta-val">${issuedStr}</span>
+        </div>` : ''}
+      ${daysStr ? `
+        <div class="staff-meta-row">
+          <span class="staff-meta-lbl">Dias</span>
+          <span class="staff-meta-val">${daysStr}</span>
+        </div>` : ''}
+      ${m.schedule ? `
+        <div class="staff-meta-row">
+          <span class="staff-meta-lbl">Horário</span>
+          <span class="staff-meta-val">${esc(m.schedule)}</span>
+        </div>` : ''}
+    </div>
+
+    ${m.credentialId ? `
+      <div class="staff-card-barcode" onclick="event.stopPropagation()">
+        <svg id="${bcId}" style="width:100%;height:36px"></svg>
+      </div>` : ''}
+  </div>`;
+}
+
+function renderStaffBarcodes(members) {
+  members.forEach(m => {
+    if (!m.credentialId) return;
+    const el = document.getElementById('bc-mini-' + m.id);
+    if (!el) return;
+    try {
+      JsBarcode(el, m.credentialId, {
+        format:'CODE128', lineColor:'#0d0e1c', background:'transparent',
+        width:1.2, height:28, displayValue:false, margin:0
+      });
+    } catch(e) {}
+  });
 }
 
 function renderCheckinsList(checkins, members) {
@@ -1679,6 +1802,8 @@ function populateAccessSelect(ev) {
     all.map(a => `<option value="${esc(a)}" ${a === current ? 'selected' : ''}>${esc(a)}</option>`).join('');
 }
 
+const WEEK_DAYS = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+
 function initAddStaffForm() {
   const m = editingMemberId ? state.staff.find(s => s.id === editingMemberId) : null;
   document.getElementById('add-staff-title').textContent = m ? 'Editar Membro' : 'Novo Membro';
@@ -1686,11 +1811,39 @@ function initAddStaffForm() {
   document.getElementById('staff-role').value = m ? m.role : '';
   document.getElementById('staff-email').value = m ? m.email : '';
   document.getElementById('staff-phone').value = m ? m.phone : '';
-  document.getElementById('staff-notes').value = m ? m.notes : '';
+  document.getElementById('staff-notes').value = m ? m.notes || '' : '';
+  document.getElementById('staff-schedule').value = m ? m.schedule || '' : '';
+
+  // Days checkboxes
+  const selectedDays = m ? (m.days || []) : [];
+  document.getElementById('staff-days-wrap').innerHTML = WEEK_DAYS.map(d => `
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;background:var(--surface2);border:1.5px solid ${selectedDays.includes(d)?'var(--blue)':'var(--border)'};border-radius:8px;padding:5px 10px;user-select:none">
+      <input type="checkbox" value="${d}" ${selectedDays.includes(d)?'checked':''} onchange="toggleDayChip(this)" style="display:none">
+      <span style="color:${selectedDays.includes(d)?'var(--blue)':'var(--text-muted)'};font-weight:${selectedDays.includes(d)?'700':'400'}">${d}</span>
+    </label>
+  `).join('');
 
   const ev = state.events.find(e => e.id === currentEventId);
   populateAccessSelect(ev);
   if (m) document.getElementById('staff-access').value = m.access;
+}
+
+function toggleDayChip(input) {
+  const lbl = input.closest('label');
+  const span = lbl.querySelector('span');
+  if (input.checked) {
+    lbl.style.borderColor = 'var(--blue)';
+    span.style.color = 'var(--blue)';
+    span.style.fontWeight = '700';
+  } else {
+    lbl.style.borderColor = 'var(--border)';
+    span.style.color = 'var(--text-muted)';
+    span.style.fontWeight = '400';
+  }
+}
+
+function getSelectedDays() {
+  return [...document.querySelectorAll('#staff-days-wrap input[type=checkbox]:checked')].map(i => i.value);
 }
 
 async function saveMember() {
@@ -1702,6 +1855,9 @@ async function saveMember() {
   const memberId = editingMemberId || uid();
   const existing = editingMemberId ? state.staff.find(s => s.id === editingMemberId) : null;
 
+  const days = getSelectedDays();
+  const schedule = document.getElementById('staff-schedule').value.trim();
+
   const member = {
     id: memberId,
     eventId: currentEventId,
@@ -1710,14 +1866,17 @@ async function saveMember() {
     email: document.getElementById('staff-email').value.trim(),
     phone: document.getElementById('staff-phone').value.trim(),
     notes: document.getElementById('staff-notes').value.trim(),
-    access,
+    access, days, schedule,
     credentialId: existing ? existing.credentialId : null,
     credentialQRData: existing ? existing.credentialQRData : null,
     createdAt: existing ? existing.createdAt : Date.now(),
+    issuedAt: existing ? existing.issuedAt : null,
   };
 
   if (!editingMemberId) {
+    const now = Date.now();
     member.credentialId = 'CRED-' + uid(8).toUpperCase();
+    member.issuedAt = now;
     member.credentialQRData = JSON.stringify({
       type: 'stage-access-credential',
       credId: member.credentialId,
@@ -1725,7 +1884,8 @@ async function saveMember() {
       name: member.name,
       role: member.role,
       access: member.access,
-      issued: Date.now(),
+      days, schedule,
+      issued: now,
     });
   }
 
@@ -1849,13 +2009,22 @@ async function renderCredential() {
   } catch(e) {}
 
   // Member info
+  const issuedStr = member.issuedAt
+    ? new Date(member.issuedAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'long',year:'numeric'}) + ' às ' +
+      new Date(member.issuedAt).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})
+    : '—';
+  const daysStr = member.days && member.days.length ? member.days.join(' · ') : '—';
+
   const infoEl = document.getElementById('member-detail-info');
   infoEl.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       ${infoRow('Nome', member.name)}
       ${infoRow('Função', member.role || '—')}
-      ${infoRow('Acesso', member.access)}
-      ${infoRow('Credencial', member.credentialId)}
+      ${infoRow('Acesso / Permissão', member.access)}
+      ${infoRow('Dias', daysStr)}
+      ${member.schedule ? infoRow('Horário', member.schedule) : ''}
+      ${infoRow('Emitido em', issuedStr)}
+      ${member.credentialId ? `<div style="grid-column:1/-1">${infoRow('Código da Credencial', member.credentialId)}</div>` : ''}
       ${member.email ? infoRow('Email', member.email) : ''}
       ${member.phone ? infoRow('Telefone', member.phone) : ''}
       ${member.notes ? `<div style="grid-column:1/-1">${infoRow('Notas', member.notes)}</div>` : ''}
