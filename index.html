@@ -833,18 +833,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       <div class="card" style="margin-bottom:16px">
         <div class="card-header"><span class="card-title">Tipos de Acesso</span></div>
         <div id="access-types-list">
-          <div class="list-item" style="cursor:default;padding:10px 12px;" data-access="All Access">
-            <div class="list-item-body"><div class="list-item-name">All Access</div></div>
-            <span class="badge badge-gold">Predefinido</span>
-          </div>
-          <div class="list-item" style="cursor:default;padding:10px 12px;" data-access="Backstage">
-            <div class="list-item-body"><div class="list-item-name">Backstage</div></div>
-            <span class="badge badge-gray">Predefinido</span>
-          </div>
-          <div class="list-item" style="cursor:default;padding:10px 12px;" data-access="Press / Media">
-            <div class="list-item-body"><div class="list-item-name">Press / Media</div></div>
-            <span class="badge badge-gray">Predefinido</span>
-          </div>
+          <!-- populated dynamically by renderAccessTypesList() -->
+          <div style="padding:10px 12px;font-size:12px;color:var(--text-muted)">A carregar tipos de acesso…</div>
         </div>
         <div style="display:flex;gap:10px;margin-top:12px;">
           <input id="new-access-type" class="form-input" type="text" placeholder="Novo tipo de acesso...">
@@ -1571,14 +1561,16 @@ function selectColor(el) {
 }
 
 function renderAccessTypesList() {
-  const defaults = ['All Access', 'Backstage', 'Press / Media'];
   const container = document.getElementById('access-types-list');
-  container.innerHTML = defaults.map(a => `
-    <div class="list-item" style="cursor:default;padding:10px 12px;" data-access="${a}">
-      <div class="list-item-body"><div class="list-item-name">${esc(a)}</div></div>
-      <span class="badge badge-gray">Predefinido</span>
-    </div>
-  `).join('') + customAccessTypes.map((a,i) => `
+  container.innerHTML = ACCESS_GROUPS.map(g => `
+    <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;padding:8px 12px 4px">${esc(g.label)}</div>
+    ${g.options.map(a => `
+      <div class="list-item" style="cursor:default;padding:8px 12px;" data-access="${a}">
+        <div class="list-item-body"><div class="list-item-name" style="font-size:13px">${esc(a)}</div></div>
+        <span class="badge badge-gray" style="font-size:9px">Predefinido</span>
+      </div>
+    `).join('')}
+  `).join('') + (customAccessTypes.length ? `<div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;padding:8px 12px 4px">Personalizados</div>` : '') + customAccessTypes.map((a,i) => `
     <div class="list-item" style="cursor:default;padding:10px 12px;">
       <div class="list-item-body"><div class="list-item-name">${esc(a)}</div></div>
       <button class="btn btn-danger btn-sm" onclick="removeAccessType(${i})">Remover</button>
@@ -1840,14 +1832,66 @@ async function clearCheckins() {
 // ════════════════════════════════════════════════════════
 //  STAFF / MEMBER
 // ════════════════════════════════════════════════════════
+// ── Access type catalogue ──
+const ACCESS_GROUPS = [
+  { label: 'Acesso Geral', options: [
+    'All Access',
+    'Acesso Geral',
+    'Acesso Limitado',
+  ]},
+  { label: 'Zonas de Público', options: [
+    'Público / Plateia',
+    'Bancada',
+    'Relvado / Pista',
+    'Fosso (Pit)',
+    'Lado do Palco',
+  ]},
+  { label: 'Áreas Exclusivas', options: [
+    'VIP',
+    'Backstage',
+    'Camarins',
+    'Palco',
+    'Frente de Casa (FOH)',
+    'Zona Mista',
+  ]},
+  { label: 'Equipa', options: [
+    'Produção',
+    'Equipa Técnica',
+    'Staff',
+    'Segurança',
+    'Operações',
+    'Carga e Descarga',
+    'Bilheteira',
+    'Credenciação',
+    'Catering',
+    'Hospitalidade',
+  ]},
+  { label: 'Artistas', options: [
+    'Artista',
+    'Convidado do Artista',
+  ]},
+  { label: 'Media', options: [
+    'Media / Imprensa',
+    'Fotógrafo',
+    'Foto (Primeiras 3 Músicas)',
+    'Vídeo',
+  ]},
+];
+
+const ACCESS_ALL_DEFAULTS = ACCESS_GROUPS.flatMap(g => g.options);
+
 function populateAccessSelect(ev) {
   const sel = document.getElementById('staff-access');
-  const defaults = ['All Access', 'Backstage', 'Press / Media'];
   const custom = ev ? (ev.customAccessTypes || []) : [];
-  const all = [...defaults, ...custom];
   const current = sel.value;
+
   sel.innerHTML = '<option value="">Seleccionar acesso...</option>' +
-    all.map(a => `<option value="${esc(a)}" ${a === current ? 'selected' : ''}>${esc(a)}</option>`).join('');
+    ACCESS_GROUPS.map(g => `
+      <optgroup label="${esc(g.label)}">
+        ${g.options.map(a => `<option value="${esc(a)}" ${a===current?'selected':''}>${esc(a)}</option>`).join('')}
+      </optgroup>
+    `).join('') +
+    (custom.length ? `<optgroup label="Personalizados">${custom.map(a=>`<option value="${esc(a)}" ${a===current?'selected':''}>${esc(a)}</option>`).join('')}</optgroup>` : '');
 }
 
 const WEEK_DAYS = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
@@ -2382,8 +2426,7 @@ function parseCSV(text) {
 
   const members = [];
   const ev = state.events.find(e => e.id === currentEventId);
-  const defaults = ['All Access', 'Backstage', 'Press / Media'];
-  const validAccess = [...defaults, ...(ev ? ev.customAccessTypes || [] : [])];
+  const validAccess = [...ACCESS_ALL_DEFAULTS, ...(ev ? ev.customAccessTypes || [] : [])];
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
