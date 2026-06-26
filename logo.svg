@@ -1,0 +1,22 @@
+<svg width="120" height="160" viewBox="0 0 120 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Clip -->
+  <rect x="54" y="0" width="12" height="18" rx="6" fill="#2259e0"/>
+  <rect x="57" y="3" width="6" height="12" rx="3" fill="#0d0e1c"/>
+  <!-- Connector -->
+  <rect x="58" y="16" width="4" height="10" fill="#2259e0"/>
+  <!-- Badge body -->
+  <rect x="10" y="25" width="100" height="128" rx="18" fill="#2259e0"/>
+  <!-- Top shine -->
+  <rect x="10" y="25" width="100" height="64" rx="18" fill="white" opacity="0.06"/>
+  <!-- Corner dots -->
+  <circle cx="28" cy="43" r="4" fill="white" opacity="0.15"/>
+  <circle cx="92" cy="43" r="4" fill="white" opacity="0.15"/>
+  <!-- Lightning bolt -->
+  <path d="M67 44 L53 75 L62 75 L55 100 L73 65 L63 65 Z" fill="white"/>
+  <!-- STAGE -->
+  <text x="60" y="122" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="13" fill="white" text-anchor="middle" letter-spacing="3">STAGE</text>
+  <!-- ACCESS -->
+  <text x="60" y="140" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="13" fill="white" text-anchor="middle" letter-spacing="3">ACCESS</text>
+  <!-- Divider line -->
+  <rect x="30" y="146" width="60" height="1.5" fill="white" opacity="0.25" rx="1"/>
+</svg>
