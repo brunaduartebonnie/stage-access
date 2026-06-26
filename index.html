@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -2060,32 +2061,66 @@ async function renderCredential() {
   `;
 }
 
-// Reliable QR generator — renders into offscreen div, returns PNG data URL
-function generateQRDataURL(text, size) {
+// Reliable QR generator using the modern qrcode library (soldair)
+// Falls back to qrcodejs if needed
+async function generateQRDataURL(text, size) {
   size = size || 200;
+
+  // Try soldair qrcode library first (exports as window.qrcode lowercase)
+  try {
+    if (typeof qrcode !== 'undefined' && typeof qrcode.toDataURL === 'function') {
+      const url = await qrcode.toDataURL(text, {
+        errorCorrectionLevel: 'M',
+        width: size,
+        margin: 1,
+        color: { dark: '#000000', light: '#ffffff' },
+      });
+      if (url && url.startsWith('data:')) return url;
+    }
+  } catch(e) {}
+
+  // Fallback: use qrcodejs by drawing into a real visible canvas
   return new Promise(resolve => {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:' + size + 'px;height:' + size + 'px;';
-    document.body.appendChild(wrap);
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    canvas.style.cssText = 'position:absolute;top:-9999px;left:0;';
+    document.body.appendChild(canvas);
+
+    const tmpDiv = document.createElement('div');
+    tmpDiv.style.cssText = 'position:absolute;top:-9999px;left:0;width:' + size + 'px;height:' + size + 'px;';
+    document.body.appendChild(tmpDiv);
+
     try {
-      new QRCode(wrap, {
+      new QRCode(tmpDiv, {
         text, width: size, height: size,
         colorDark: '#000000', colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M,
       });
-    } catch(e) { document.body.removeChild(wrap); resolve(null); return; }
-    // Give QRCode.js time to paint the canvas
-    setTimeout(() => {
+    } catch(e) {
+      document.body.removeChild(tmpDiv);
+      document.body.removeChild(canvas);
+      resolve(null); return;
+    }
+
+    // qrcodejs draws synchronously — get canvas immediately
+    const qrCanvas = tmpDiv.querySelector('canvas');
+    if (qrCanvas) {
       try {
-        const canvas = wrap.querySelector('canvas');
-        const img = wrap.querySelector('img');
-        let url = null;
-        if (canvas) url = canvas.toDataURL('image/png');
-        else if (img && img.src) url = img.src;
-        document.body.removeChild(wrap);
-        resolve(url);
-      } catch(e) { document.body.removeChild(wrap); resolve(null); }
-    }, 80);
+        const url = qrCanvas.toDataURL('image/png');
+        document.body.removeChild(tmpDiv);
+        document.body.removeChild(canvas);
+        resolve(url); return;
+      } catch(e) {}
+    }
+
+    // Last resort: wait for img element
+    setTimeout(() => {
+      const img = tmpDiv.querySelector('img');
+      const url = img ? img.src : null;
+      document.body.removeChild(tmpDiv);
+      document.body.removeChild(canvas);
+      resolve(url);
+    }, 300);
   });
 }
 
