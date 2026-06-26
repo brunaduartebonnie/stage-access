@@ -527,11 +527,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 .staff-meta-val{font-size:12px;color:var(--text-muted);}
 .staff-meta-val.mono{font-family:monospace;font-size:11px;color:var(--text);letter-spacing:.5px;}
 
-.staff-card-barcode{
-  background:var(--surface2);border-radius:6px;
-  padding:6px 10px;margin-top:4px;
+.staff-card-codes{
+  display:flex;align-items:center;gap:10px;
+  background:var(--surface2);border-radius:8px;
+  padding:8px 10px;margin-top:4px;
   border:1px solid var(--border);
 }
+.staff-card-barcode-wrap{flex:1;display:flex;align-items:center;}
+.staff-card-barcode-wrap svg{width:100%;height:36px;}
+.staff-card-qr{
+  flex-shrink:0;width:64px;height:64px;
+  border-radius:6px;overflow:hidden;
+  background:white;
+  display:flex;align-items:center;justify-content:center;
+}
+.staff-card-qr canvas,.staff-card-qr img{width:64px!important;height:64px!important;display:block;}
 
 /* ── IMPORT FEEDBACK ── */
 .import-feedback{
@@ -1744,8 +1754,11 @@ function renderStaffCard(m) {
     </div>
 
     ${m.credentialId ? `
-      <div class="staff-card-barcode" onclick="event.stopPropagation()">
-        <svg id="${bcId}" style="width:100%;height:36px"></svg>
+      <div class="staff-card-codes" onclick="event.stopPropagation()">
+        <div class="staff-card-barcode-wrap">
+          <svg id="${bcId}" style="width:100%;height:36px"></svg>
+        </div>
+        <div class="staff-card-qr" id="qr-mini-${m.id}"></div>
       </div>` : ''}
   </div>`;
 }
@@ -1753,14 +1766,29 @@ function renderStaffCard(m) {
 function renderStaffBarcodes(members) {
   members.forEach(m => {
     if (!m.credentialId) return;
+    // Barcode
     const el = document.getElementById('bc-mini-' + m.id);
-    if (!el) return;
-    try {
-      JsBarcode(el, m.credentialId, {
-        format:'CODE128', lineColor:'#0d0e1c', background:'transparent',
-        width:1.2, height:28, displayValue:false, margin:0
-      });
-    } catch(e) {}
+    if (el) {
+      try {
+        JsBarcode(el, m.credentialId, {
+          format:'CODE128', lineColor:'#0d0e1c', background:'transparent',
+          width:1.2, height:28, displayValue:false, margin:0
+        });
+      } catch(e) {}
+    }
+    // QR code
+    const qrEl = document.getElementById('qr-mini-' + m.id);
+    if (qrEl && m.credentialQRData) {
+      try {
+        qrEl.innerHTML = '';
+        new QRCode(qrEl, {
+          text: m.credentialQRData,
+          width: 64, height: 64,
+          colorDark: '#0d0e1c', colorLight: 'transparent',
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+      } catch(e) {}
+    }
   });
 }
 
