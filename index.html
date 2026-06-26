@@ -2530,7 +2530,14 @@ function dsInit() {
       ds.renderAll(); dsUpdateLayers();
     });
   } else {
+    // Build default layout and auto-save so all credentials use it
     dsDefaultLayout(ev, accent);
+    setTimeout(async () => {
+      if (!ev) return;
+      ev.credentialTemplate = ds.toJSON(['customType','placeholder','libId']);
+      try { await upsertEvent(ev); toast('Template base criado automaticamente', 'success'); }
+      catch(e) {}
+    }, 400);
   }
 
   ds.on('object:modified', dsUpdateLayers);
@@ -2546,12 +2553,99 @@ function dsInit() {
 }
 
 function dsDefaultLayout(ev, accent) {
-  const stripe = new fabric.Rect({ width:DS_W, height:80, left:0, top:DS_H-80, fill:accent, selectable:true, customType:'stripe' });
-  const saLabel = new fabric.Text('STAGE ACCESS', { left:DS_W/2, top:16, fontSize:9, fill:'rgba(255,255,255,0.3)', fontFamily:'Arial', fontWeight:'700', originX:'center', customType:'text' });
-  const artistTxt = new fabric.IText(ev ? (ev.artist||ev.name).toUpperCase() : 'NOME DO ARTISTA', { left:DS_W/2, top:34, fontSize:22, fill:'#ffffff', fontFamily:'Arial', fontWeight:'800', originX:'center', textAlign:'center', customType:'text' });
-  const nameTxt = new fabric.IText(DS_PH_LABELS.name, { left:DS_W/2, top:DS_H-64, fontSize:16, fill:'#ffffff', fontFamily:'Arial', fontWeight:'700', originX:'center', textAlign:'center', customType:'placeholder', placeholder:'name' });
-  const accessTxt = new fabric.IText(DS_PH_LABELS.access, { left:DS_W/2, top:DS_H-38, fontSize:11, fill:'rgba(255,255,255,0.8)', fontFamily:'Arial', fontWeight:'800', originX:'center', textAlign:'center', customType:'placeholder', placeholder:'access' });
-  [stripe, saLabel, artistTxt, nameTxt, accessTxt].forEach(o => ds.add(o));
+  const bg = '#12163a';
+  ds.backgroundColor = bg;
+  document.getElementById('ds-bg-color').value = bg;
+
+  const artistName = ev ? (ev.artist || ev.name || 'ARTISTA').toUpperCase() : 'ARTISTA';
+  const eventName  = ev ? (ev.name || '').toUpperCase() : '';
+  const dateStr    = ev && ev.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'}) : '';
+
+  // ── Bottom accent stripe ──
+  const stripe = new fabric.Rect({
+    width:DS_W, height:72, left:0, top:DS_H-72,
+    fill:accent, selectable:true, customType:'stripe',
+  });
+
+  // ── Top bar ──
+  const topBar = new fabric.Rect({
+    width:DS_W, height:36, left:0, top:0,
+    fill:'rgba(255,255,255,0.05)', selectable:false, evented:false, customType:'text',
+  });
+
+  // ── "STAGE ACCESS" label top right ──
+  const saLabel = new fabric.Text('STAGE ACCESS', {
+    left:DS_W-14, top:13, fontSize:8,
+    fill:'rgba(255,255,255,0.35)', fontFamily:'Arial', fontWeight:'700',
+    originX:'right', letterSpacing:2, customType:'text',
+  });
+
+  // ── Artist name ──
+  const artistTxt = new fabric.IText(artistName, {
+    left:DS_W/2, top:52, fontSize:26,
+    fill:'#ffffff', fontFamily:'Arial', fontWeight:'900',
+    originX:'center', textAlign:'center', customType:'text',
+  });
+
+  // ── Event / tour name (smaller) ──
+  const eventTxt = new fabric.IText(eventName, {
+    left:DS_W/2, top:88, fontSize:11,
+    fill:'rgba(255,255,255,0.5)', fontFamily:'Arial', fontWeight:'600',
+    originX:'center', textAlign:'center', letterSpacing:1, customType:'text',
+  });
+
+  // ── Date ──
+  const dateTxt = new fabric.IText(dateStr, {
+    left:DS_W/2, top:108, fontSize:10,
+    fill:'rgba(255,255,255,0.4)', fontFamily:'Arial', fontWeight:'400',
+    originX:'center', textAlign:'center', customType:'placeholder', placeholder:'date',
+  });
+
+  // ── Divider ──
+  const divider = new fabric.Rect({
+    width:DS_W-48, height:1, left:24, top:130,
+    fill:'rgba(255,255,255,0.12)', selectable:false, evented:false, customType:'text',
+  });
+
+  // ── QR placeholder box (centre) ──
+  const qrBox = new fabric.Rect({
+    width:90, height:90, left:DS_W/2-45, top:148,
+    fill:'rgba(255,255,255,0.08)', stroke:'rgba(255,255,255,0.15)',
+    strokeWidth:1, rx:6, ry:6, selectable:true, customType:'qr-placeholder',
+  });
+  const qrLabel = new fabric.Text('QR CODE', {
+    left:DS_W/2, top:185, fontSize:9,
+    fill:'rgba(255,255,255,0.3)', fontFamily:'Arial', fontWeight:'700',
+    originX:'center', textAlign:'center', letterSpacing:2, customType:'text',
+  });
+
+  // ── Person name placeholder ──
+  const nameTxt = new fabric.IText(DS_PH_LABELS.name, {
+    left:DS_W/2, top:DS_H-72+8, fontSize:17,
+    fill:'#ffffff', fontFamily:'Arial', fontWeight:'800',
+    originX:'center', textAlign:'center',
+    customType:'placeholder', placeholder:'name',
+  });
+
+  // ── Role placeholder ──
+  const roleTxt = new fabric.IText(DS_PH_LABELS.role, {
+    left:DS_W/2, top:DS_H-72+30, fontSize:10,
+    fill:'rgba(255,255,255,0.7)', fontFamily:'Arial', fontWeight:'400',
+    originX:'center', textAlign:'center',
+    customType:'placeholder', placeholder:'role',
+  });
+
+  // ── Access type placeholder ──
+  const accessTxt = new fabric.IText(DS_PH_LABELS.access, {
+    left:DS_W/2, top:DS_H-72+47, fontSize:10,
+    fill:'rgba(255,255,255,0.9)', fontFamily:'Arial', fontWeight:'800',
+    originX:'center', textAlign:'center', letterSpacing:2,
+    customType:'placeholder', placeholder:'access',
+  });
+
+  [topBar, stripe, saLabel, artistTxt, eventTxt, dateTxt, divider,
+   qrBox, qrLabel, nameTxt, roleTxt, accessTxt].forEach(o => ds.add(o));
+
   ds.renderAll(); dsUpdateLayers();
 }
 
@@ -2815,29 +2909,88 @@ async function generateCredentialImage(member, ev) {
   const template = ev && ev.credentialTemplate;
   if (!template) return null;
 
-  return new Promise(resolve => {
+  // Step 1: render Fabric canvas with placeholders replaced
+  const fabricDataUrl = await new Promise(resolve => {
     const tmpEl = document.createElement('canvas');
-    tmpEl.id = 'tmp-gen-canvas'; tmpEl.style.display='none'; document.body.appendChild(tmpEl);
+    tmpEl.style.display='none'; document.body.appendChild(tmpEl);
     const tmpFab = new fabric.Canvas(tmpEl, { width:DS_W, height:DS_H });
     tmpFab.loadFromJSON(template, () => {
+      // Find QR placeholder position before removing it
+      let qrObj = null;
       tmpFab.getObjects().forEach(o => {
+        if (o.customType === 'qr-placeholder') { qrObj = o; }
         if (!o.placeholder) return;
         let val = '';
         switch(o.placeholder) {
-          case 'name': val = member.name; break;
-          case 'role': val = member.role||''; break;
+          case 'name':   val = member.name; break;
+          case 'role':   val = member.role||''; break;
           case 'access': val = member.access; break;
-          case 'event': val = ev.name; break;
-          case 'date': val = ev.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'}) : ''; break;
+          case 'event':  val = ev.name; break;
+          case 'date':   val = ev.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'}) : ''; break;
         }
         o.set('text', val);
       });
+      // Remove rect QR placeholder (we'll draw real QR on top)
+      if (qrObj && qrObj.type === 'rect') tmpFab.remove(qrObj);
       tmpFab.renderAll();
       const url = tmpFab.toDataURL({ multiplier:2, format:'png' });
-      tmpFab.dispose();
-      document.body.removeChild(tmpEl);
-      resolve(url);
+      tmpFab.dispose(); document.body.removeChild(tmpEl);
+      resolve({ url, qrObj });
     });
+  });
+
+  // Step 2: generate real QR code as image
+  const qrDataUrl = await new Promise(resolve => {
+    if (!member.credentialQRData) { resolve(null); return; }
+    const div = document.createElement('div'); div.style.display='none'; document.body.appendChild(div);
+    new QRCode(div, { text:member.credentialQRData, width:180, height:180, colorDark:'#000000', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M });
+    setTimeout(() => {
+      const img = div.querySelector('img');
+      document.body.removeChild(div);
+      resolve(img ? img.src : null);
+    }, 400);
+  });
+
+  // Step 3: composite — draw badge then QR on top at placeholder position
+  return new Promise(resolve => {
+    const scale = 2;
+    const out = document.createElement('canvas');
+    out.width = DS_W * scale; out.height = DS_H * scale;
+    const ctx = out.getContext('2d');
+    const badgeImg = new Image();
+    badgeImg.onload = () => {
+      ctx.drawImage(badgeImg, 0, 0);
+      if (qrDataUrl && fabricDataUrl.qrObj) {
+        const qo = fabricDataUrl.qrObj;
+        const qrImg = new Image();
+        qrImg.onload = () => {
+          // Draw white bg + QR at placeholder position
+          const x = (qo.left||0) * scale;
+          const y = (qo.top||0) * scale;
+          const w = (qo.width||90) * scale;
+          const h = (qo.height||90) * scale;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill();
+          ctx.drawImage(qrImg, x+4, y+4, w-8, h-8);
+          resolve(out.toDataURL('image/png'));
+        };
+        qrImg.onerror = () => resolve(out.toDataURL('image/png'));
+        qrImg.src = qrDataUrl;
+      } else if (qrDataUrl) {
+        // No position info — draw centred at 250,148
+        const qrImg = new Image();
+        qrImg.onload = () => {
+          const x = (DS_W/2-45)*scale, y = 148*scale, s = 90*scale;
+          ctx.fillStyle='#ffffff'; ctx.fillRect(x,y,s,s);
+          ctx.drawImage(qrImg, x+4, y+4, s-8, s-8);
+          resolve(out.toDataURL('image/png'));
+        };
+        qrImg.src = qrDataUrl;
+      } else {
+        resolve(out.toDataURL('image/png'));
+      }
+    };
+    badgeImg.src = fabricDataUrl.url;
   });
 }
 
