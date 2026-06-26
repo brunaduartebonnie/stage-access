@@ -496,52 +496,36 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 .checkin-item-access{font-size:11px;color:var(--gold);}
 
 /* ── STAFF GROUPS & CARDS ── */
-.staff-group{margin-bottom:20px;}
+.staff-group{margin-bottom:14px;}
 .staff-group-header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:6px 4px 8px;
+  padding:4px 2px 6px;
   border-bottom:2px solid var(--blue);
-  margin-bottom:10px;
+  margin-bottom:0;
 }
-.staff-group-label{font-size:13px;font-weight:700;color:var(--blue);letter-spacing:.5px;text-transform:uppercase;}
-.staff-group-count{font-size:11px;font-weight:700;background:var(--blue);color:#fff;border-radius:20px;padding:2px 8px;}
-
-.staff-card{
+.staff-group-label{font-size:11px;font-weight:700;color:var(--blue);letter-spacing:.8px;text-transform:uppercase;}
+.staff-group-count{font-size:10px;font-weight:700;background:var(--blue);color:#fff;border-radius:20px;padding:1px 7px;}
+.staff-group-body{
   background:var(--surface);border:1.5px solid var(--border);
-  border-radius:var(--radius);padding:12px 14px;
-  margin-bottom:8px;cursor:pointer;transition:border-color .15s,box-shadow .15s;
+  border-top:none;border-radius:0 0 var(--radius) var(--radius);
+  overflow:hidden;
 }
-.staff-card:hover{border-color:rgba(34,89,224,0.4);box-shadow:0 2px 12px rgba(34,89,224,0.08);}
-.staff-card-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
-.staff-card-avatar{
-  width:36px;height:36px;border-radius:50%;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  font-size:12px;font-weight:700;
-}
-.staff-card-info{flex:1;min-width:0;}
-.staff-card-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-.staff-card-meta{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;}
-.staff-meta-row{display:flex;align-items:baseline;gap:6px;}
-.staff-meta-lbl{font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;min-width:52px;flex-shrink:0;}
-.staff-meta-val{font-size:12px;color:var(--text-muted);}
-.staff-meta-val.mono{font-family:monospace;font-size:11px;color:var(--text);letter-spacing:.5px;}
-
-.staff-card-codes{
+.staff-row{
   display:flex;align-items:center;gap:10px;
-  background:var(--surface2);border-radius:8px;
-  padding:8px 10px;margin-top:4px;
-  border:1px solid var(--border);
+  padding:9px 12px;cursor:pointer;
+  border-bottom:1px solid var(--border);
+  transition:background .12s;
 }
-.staff-card-barcode-wrap{flex:1;display:flex;align-items:center;}
-.staff-card-barcode-wrap svg{width:100%;height:36px;}
-.staff-card-qr{
-  flex-shrink:0;width:64px;height:64px;
-  border-radius:6px;overflow:hidden;
-  background:white;
+.staff-row:last-child{border-bottom:none;}
+.staff-row:hover{background:var(--surface2);}
+.staff-row-avatar{
+  width:30px;height:30px;border-radius:50%;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;
 }
-.staff-card-qr canvas,.staff-card-qr img{width:64px!important;height:64px!important;display:block;}
+.staff-row-name{flex:1;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.staff-row-right{display:flex;align-items:center;gap:6px;flex-shrink:0;}
 
 /* ── IMPORT FEEDBACK ── */
 .import-feedback{
@@ -1659,7 +1643,6 @@ function renderEventDetail() {
   document.getElementById('stat-checkins').textContent = checkins.length;
 
   renderStaffList(members);
-  setTimeout(() => renderStaffBarcodes(members), 80);
   renderCheckinsList(checkins, members);
 
   // Populate access types select
@@ -1694,95 +1677,31 @@ function renderStaffList(members) {
           <span class="staff-group-label">${esc(role)}</span>
           <span class="staff-group-count">${gMembers.length}</span>
         </div>
-        ${gMembers.map(m => renderStaffCard(m)).join('')}
+        <div class="staff-group-body">
+          ${gMembers.map(m => renderStaffCard(m)).join('')}
+        </div>
       </div>
     `;
   }).join('');
 }
 
 function renderStaffCard(m) {
-  const issuedStr = m.issuedAt
-    ? new Date(m.issuedAt).toLocaleDateString('pt-PT', {day:'2-digit',month:'short',year:'numeric'}) + ' ' +
-      new Date(m.issuedAt).toLocaleTimeString('pt-PT', {hour:'2-digit',minute:'2-digit'})
-    : null;
-  const daysStr = m.days && m.days.length ? m.days.join(' · ') : null;
-
-  // Mini barcode SVG via JsBarcode (rendered after insert)
-  const bcId = 'bc-mini-' + m.id;
-
-  return `<div class="staff-card" onclick="openMember('${m.id}')">
-    <div class="staff-card-top">
-      <div class="staff-card-avatar" style="background:${accessBg(m.access)};color:${accessFg(m.access)}">
-        ${m.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}
-      </div>
-      <div class="staff-card-info">
-        <div class="staff-card-name">${esc(m.name)}</div>
-        <span class="badge ${accessBadgeClass(m.access)}">${esc(m.access||'—')}</span>
-      </div>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+  const initials = m.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();
+  const hasCredential = !!m.credentialId;
+  return `<div class="staff-row" onclick="openMember('${m.id}')">
+    <div class="staff-row-avatar" style="background:${accessBg(m.access)};color:${accessFg(m.access)}">${initials}</div>
+    <div class="staff-row-name">${esc(m.name)}</div>
+    <div class="staff-row-right">
+      <span class="badge ${accessBadgeClass(m.access)}">${esc(m.access||'—')}</span>
+      ${hasCredential
+        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13" style="color:var(--green)" title="Credencial emitida"><polyline points="20 6 9 17 4 12"/></svg>`
+        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="color:var(--text-dim)" title="Sem credencial"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
-
-    <div class="staff-card-meta">
-      ${m.credentialId ? `
-        <div class="staff-meta-row">
-          <span class="staff-meta-lbl">Código</span>
-          <span class="staff-meta-val mono">${esc(m.credentialId)}</span>
-        </div>` : ''}
-      ${issuedStr ? `
-        <div class="staff-meta-row">
-          <span class="staff-meta-lbl">Emitido</span>
-          <span class="staff-meta-val">${issuedStr}</span>
-        </div>` : ''}
-      ${daysStr ? `
-        <div class="staff-meta-row">
-          <span class="staff-meta-lbl">Dias</span>
-          <span class="staff-meta-val">${daysStr}</span>
-        </div>` : ''}
-      ${m.schedule ? `
-        <div class="staff-meta-row">
-          <span class="staff-meta-lbl">Horário</span>
-          <span class="staff-meta-val">${esc(m.schedule)}</span>
-        </div>` : ''}
-    </div>
-
-    ${m.credentialId ? `
-      <div class="staff-card-codes" onclick="event.stopPropagation()">
-        <div class="staff-card-barcode-wrap">
-          <svg id="${bcId}" style="width:100%;height:36px"></svg>
-        </div>
-        <div class="staff-card-qr" id="qr-mini-${m.id}"></div>
-      </div>` : ''}
   </div>`;
 }
 
-function renderStaffBarcodes(members) {
-  members.forEach(m => {
-    if (!m.credentialId) return;
-    // Barcode
-    const el = document.getElementById('bc-mini-' + m.id);
-    if (el) {
-      try {
-        JsBarcode(el, m.credentialId, {
-          format:'CODE128', lineColor:'#0d0e1c', background:'transparent',
-          width:1.2, height:28, displayValue:false, margin:0
-        });
-      } catch(e) {}
-    }
-    // QR code
-    const qrEl = document.getElementById('qr-mini-' + m.id);
-    if (qrEl && m.credentialQRData) {
-      try {
-        qrEl.innerHTML = '';
-        new QRCode(qrEl, {
-          text: m.credentialQRData,
-          width: 64, height: 64,
-          colorDark: '#0d0e1c', colorLight: 'transparent',
-          correctLevel: QRCode.CorrectLevel.M,
-        });
-      } catch(e) {}
-    }
-  });
-}
+function renderStaffBarcodes() {} // no-op, barcodes now only in detail view
 
 function renderCheckinsList(checkins, members) {
   const list = document.getElementById('checkins-list');
