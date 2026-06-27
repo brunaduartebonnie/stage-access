@@ -1014,6 +1014,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         </div>
       </div>
 
+      <!-- QR CODE — always visible, rendered directly into DOM -->
+      <div id="cred-qr-section" style="display:none;flex-direction:column;align-items:center;gap:8px;margin:8px 0;">
+        <div id="cred-qr-box" style="background:#fff;border-radius:12px;padding:12px;box-shadow:0 2px 12px rgba(0,0,0,.18);display:inline-block;"></div>
+        <div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;" id="cred-qr-label">QR Code · Scan para validar</div>
+      </div>
+
       <!-- ACTIONS -->
       <div class="cred-actions">
         <button class="btn btn-primary" onclick="downloadBadgeImage()">
@@ -2010,7 +2016,7 @@ async function renderCredential() {
     ? `<img class="badge-event-logo" src="${ev.eventLogoData}">`
     : `<div class="badge-event-logo-placeholder">${(ev.name||'?')[0].toUpperCase()}</div>`;
 
-  // QR in static badge — render directly into visible div (most reliable)
+  // QR in static badge (hidden when template is active, but kept for print/download)
   const qrWrap = document.getElementById('badge-qr-code');
   qrWrap.innerHTML = '';
   if (member.credentialQRData) {
@@ -2022,6 +2028,24 @@ async function renderCredential() {
         correctLevel: QRCode.CorrectLevel.M,
       });
     } catch(e) {}
+  }
+
+  // Standalone QR section — always visible on the page, rendered directly into DOM
+  const qrSection = document.getElementById('cred-qr-section');
+  const qrBox = document.getElementById('cred-qr-box');
+  qrBox.innerHTML = '';
+  if (member.credentialQRData) {
+    try {
+      new QRCode(qrBox, {
+        text: member.credentialQRData,
+        width: 160, height: 160,
+        colorDark: '#000000', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+      qrSection.style.display = 'flex';
+    } catch(e) { qrSection.style.display = 'none'; }
+  } else {
+    qrSection.style.display = 'none';
   }
 
   // Barcode
