@@ -901,6 +901,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
           </button>
         </div>
       </div>
+      <div style="position:relative;margin-bottom:8px;">
+        <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none;" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="staff-search" class="form-input" type="search" placeholder="Pesquisar membro..." style="padding-left:36px;height:38px;font-size:13px;" oninput="renderStaffList()">
+      </div>
       <div id="staff-list"></div>
     </div>
 
@@ -1469,7 +1473,7 @@ function showView(name, pushStack = true) {
 
   // Init views
   if (name === 'dashboard') renderDashboard();
-  if (name === 'event-detail') renderEventDetail();
+  if (name === 'event-detail') { const s = document.getElementById('staff-search'); if(s) s.value=''; renderEventDetail(); }
   if (name === 'create-event') initCreateEventForm();
   if (name === 'add-staff') initAddStaffForm();
   if (name === 'credential') renderCredential();
@@ -1700,17 +1704,30 @@ function renderEventDetail() {
 
 function renderStaffList(members) {
   const list = document.getElementById('staff-list');
-  if (!members.length) {
-    list.innerHTML = `<div class="empty-state">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-      <p>Nenhum membro adicionado</p><small>Adiciona manualmente ou importa via CSV</small>
-    </div>`;
+  // Apply search filter
+  const q = (document.getElementById('staff-search')?.value || '').toLowerCase().trim();
+  if (!members) members = state.staff.filter(s => s.eventId === currentEventId);
+  const filtered = q
+    ? members.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        (m.role||'').toLowerCase().includes(q) ||
+        (m.access||'').toLowerCase().includes(q) ||
+        (m.credentialId||'').toLowerCase().includes(q))
+    : members;
+
+  if (!filtered.length) {
+    list.innerHTML = q
+      ? `<div class="empty-state"><p>Nenhum resultado para "${esc(q)}"</p></div>`
+      : `<div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <p>Nenhum membro adicionado</p><small>Adiciona manualmente ou importa via CSV</small>
+        </div>`;
     return;
   }
 
   // Group by role (empty role → "Sem Função")
   const groups = {};
-  members.forEach(m => {
+  filtered.forEach(m => {
     const key = m.role && m.role.trim() ? m.role.trim() : 'Sem Função';
     if (!groups[key]) groups[key] = [];
     groups[key].push(m);
