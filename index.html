@@ -955,8 +955,23 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Horário</label>
-        <input id="staff-schedule" class="form-input" type="text" placeholder="Ex: 10:00 – 23:00 ou Durante todo o evento">
+        <label class="form-label">Horário de Acesso</label>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--text2);margin-bottom:4px;letter-spacing:.5px;">ENTRADA</div>
+            <input id="staff-time-in" class="form-input" type="text" placeholder="00:00" maxlength="5"
+              style="text-align:center;font-size:18px;font-weight:700;letter-spacing:2px;"
+              oninput="formatTimeInput(this)">
+          </div>
+          <div style="font-size:22px;color:var(--text2);padding-top:18px;">–</div>
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--text2);margin-bottom:4px;letter-spacing:.5px;">SAÍDA</div>
+            <input id="staff-time-out" class="form-input" type="text" placeholder="00:00" maxlength="5"
+              style="text-align:center;font-size:18px;font-weight:700;letter-spacing:2px;"
+              oninput="formatTimeInput(this)">
+          </div>
+        </div>
+        <input id="staff-schedule" type="hidden">
       </div>
       <div class="form-group">
         <label class="form-label">Notas</label>
@@ -1832,7 +1847,12 @@ function initAddStaffForm() {
   document.getElementById('staff-email').value = m ? m.email : '';
   document.getElementById('staff-phone').value = m ? m.phone : '';
   document.getElementById('staff-notes').value = m ? m.notes || '' : '';
-  document.getElementById('staff-schedule').value = m ? m.schedule || '' : '';
+  // Parse schedule "HH:MM – HH:MM" back into time fields
+  const sched = m ? (m.schedule || '') : '';
+  const schedMatch = sched.match(/(\d{1,2}:\d{2})\s*[–\-]\s*(\d{1,2}:\d{2})/);
+  document.getElementById('staff-time-in').value  = schedMatch ? schedMatch[1] : '';
+  document.getElementById('staff-time-out').value = schedMatch ? schedMatch[2] : '';
+  document.getElementById('staff-schedule').value = sched;
 
   // Days checkboxes
   const selectedDays = m ? (m.days || []) : [];
@@ -1862,6 +1882,12 @@ function toggleDayChip(input) {
   }
 }
 
+function formatTimeInput(el) {
+  let v = el.value.replace(/[^\d]/g, '').slice(0, 4);
+  if (v.length >= 3) v = v.slice(0,2) + ':' + v.slice(2);
+  el.value = v;
+}
+
 function getSelectedDays() {
   return [...document.querySelectorAll('#staff-days-wrap input[type=checkbox]:checked')].map(i => i.value);
 }
@@ -1876,7 +1902,9 @@ async function saveMember() {
   const existing = editingMemberId ? state.staff.find(s => s.id === editingMemberId) : null;
 
   const days = getSelectedDays();
-  const schedule = document.getElementById('staff-schedule').value.trim();
+  const timeIn  = document.getElementById('staff-time-in').value.trim();
+  const timeOut = document.getElementById('staff-time-out').value.trim();
+  const schedule = timeIn && timeOut ? `${timeIn} – ${timeOut}` : (timeIn || timeOut || '');
 
   const member = {
     id: memberId,
