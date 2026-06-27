@@ -10,8 +10,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<!-- qrcodejs MUST load last — html5-qrcode bundle overwrites window.QRCode with a different API -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- qrcode-generator: exposes window.qrcode (lowercase) — no conflict, has built-in createDataURL() -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <style>
 :root {
   --bg: #f4f6fb;
@@ -2070,33 +2070,15 @@ async function renderCredential() {
     : `<div class="badge-event-logo-placeholder">${(ev.name||'?')[0].toUpperCase()}</div>`;
 
   // QR in static badge (hidden when template is active, but kept for print/download)
-  const qrWrap = document.getElementById('badge-qr-code');
-  qrWrap.innerHTML = '';
-  if (member.credentialQRData) {
-    try {
-      new QRCode(qrWrap, {
-        text: member.credentialQRData,
-        width: 90, height: 90,
-        colorDark: '#000000', colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M,
-      });
-    } catch(e) {}
-  }
+  // QR in static badge (for print/download fallback)
+  if (member.credentialQRData) renderQRInto(document.getElementById('badge-qr-code'), member.credentialQRData, 90);
 
-  // Standalone QR section — always visible on the page, rendered directly into DOM
+  // Standalone QR — always visible on the credential page
   const qrSection = document.getElementById('cred-qr-section');
   const qrBox = document.getElementById('cred-qr-box');
-  qrBox.innerHTML = '';
   if (member.credentialQRData) {
-    try {
-      new QRCode(qrBox, {
-        text: member.credentialQRData,
-        width: 160, height: 160,
-        colorDark: '#000000', colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M,
-      });
-      qrSection.style.display = 'flex';
-    } catch(e) { qrSection.style.display = 'none'; }
+    const ok = renderQRInto(qrBox, member.credentialQRData, 160);
+    qrSection.style.display = ok ? 'flex' : 'none';
   } else {
     qrSection.style.display = 'none';
   }
@@ -2137,40 +2119,37 @@ async function renderCredential() {
 }
 
 // QR data URL — renders into a fixed visible element so canvas paints correctly
+// Generate QR as data URL — uses qrcode-generator (window.qrcode, lowercase).
+// Pure JS, no DOM/canvas needed, no library conflicts, works everywhere.
 function generateQRDataURL(text, size) {
-  // qrcodejs draws synchronously — toDataURL() works immediately, no rAF needed.
   size = size || 180;
-  const div = document.createElement('div');
-  div.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:' + size + 'px;height:' + size + 'px;';
-  document.body.appendChild(div);
   try {
-    new QRCode(div, {
-      text: String(text),
-      width: size, height: size,
-      colorDark: '#000000', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M,
-    });
-    // Canvas pixel data is available immediately after draw() — no need to wait for paint
-    const canvas = div.querySelector('canvas');
-    if (canvas && canvas.width > 0) {
-      const url = canvas.toDataURL('image/png');
-      document.body.removeChild(div);
-      return Promise.resolve(url);
-    }
-    // SVG fallback (qrcodejs uses SVG in some environments)
-    const svg = div.querySelector('svg');
-    if (svg) {
-      const s = new XMLSerializer().serializeToString(svg);
-      const url = 'data:image/svg+xml;base64,' + btoa(s);
-      document.body.removeChild(div);
-      return Promise.resolve(url);
-    }
-    document.body.removeChild(div);
-    return Promise.resolve(null);
+    const qr = qrcode(0, 'M'); // type 0 = auto, M = medium error correction
+    qr.addData(String(text));
+    qr.make();
+    const modules = qr.getModuleCount();
+    const cell = Math.max(2, Math.floor(size / (modules + 4)));
+    return Promise.resolve(qr.createDataURL(cell, Math.floor(cell * 2)));
   } catch(e) {
-    document.body.removeChild(div);
     return Promise.resolve(null);
   }
+}
+
+// Render QR directly into a visible DOM element
+function renderQRInto(el, text, size) {
+  el.innerHTML = '';
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(String(text));
+    qr.make();
+    const modules = qr.getModuleCount();
+    const cell = Math.max(2, Math.floor(size / (modules + 4)));
+    const img = document.createElement('img');
+    img.src = qr.createDataURL(cell, Math.floor(cell * 2));
+    img.style.cssText = `width:${size}px;height:${size}px;display:block;image-rendering:pixelated;`;
+    el.appendChild(img);
+    return true;
+  } catch(e) { return false; }
 }
 
 function infoRow(label, value) {
@@ -2252,14 +2231,7 @@ function generateSessionQR() {
     role: 'admin-check',
     issued: Date.now(),
   });
-  try {
-    new QRCode(container, {
-      text: payload,
-      width: 200, height: 200,
-      colorDark: '#000', colorLight: '#fff',
-      correctLevel: QRCode.CorrectLevel.M,
-    });
-  } catch(e) {}
+  renderQRInto(container, payload, 200);
 }
 
 async function refreshSessionQR() {
@@ -2959,18 +2931,14 @@ function dsAddPlaceholder(type) {
   ds.add(t); ds.setActiveObject(t); ds.renderAll(); dsUpdateLayers();
 }
 
-function dsAddQR() {
+async function dsAddQR() {
   if (!ds) return;
-  const tmp = document.createElement('div'); tmp.style.display='none'; document.body.appendChild(tmp);
-  new QRCode(tmp, { text:'STAGE-ACCESS-PREVIEW', width:80, height:80, colorDark:'#000', colorLight:'#fff' });
-  setTimeout(() => {
-    const img = tmp.querySelector('img'); const src = img ? img.src : null; document.body.removeChild(tmp);
-    if (!src) return;
-    fabric.Image.fromURL(src, fImg => {
-      fImg.set({ left:DS_W/2-40, top:360, customType:'qr-placeholder' });
-      ds.add(fImg); ds.setActiveObject(fImg); ds.renderAll(); dsUpdateLayers();
-    });
-  }, 350);
+  const src = await generateQRDataURL('STAGE-ACCESS-PREVIEW', 80);
+  if (!src) return;
+  fabric.Image.fromURL(src, fImg => {
+    fImg.set({ left:DS_W/2-40, top:360, customType:'qr-placeholder' });
+    ds.add(fImg); ds.setActiveObject(fImg); ds.renderAll(); dsUpdateLayers();
+  });
 }
 
 function dsAddBarcode() {
