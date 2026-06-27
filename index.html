@@ -8,7 +8,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -2059,21 +2058,34 @@ async function renderCredential() {
   `;
 }
 
-// QR data URL — uses visibility:hidden so canvas renders properly
+// QR data URL — renders into a fixed visible element so canvas paints correctly
 function generateQRDataURL(text, size) {
   size = size || 180;
   return new Promise(resolve => {
     const div = document.createElement('div');
-    div.style.cssText = 'visibility:hidden;position:fixed;bottom:0;right:0;width:' + size + 'px;height:' + size + 'px;';
+    // visibility:hidden = still in render tree = canvas paints
+    div.style.cssText = 'visibility:hidden;position:fixed;top:0;left:0;width:' + size + 'px;height:' + size + 'px;z-index:-1;';
     document.body.appendChild(div);
     try {
-      new QRCode(div, { text, width: size, height: size, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      new QRCode(div, {
+        text: String(text),
+        width: size, height: size,
+        colorDark: '#000000', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
     } catch(e) { document.body.removeChild(div); resolve(null); return; }
-    requestAnimationFrame(() => {
+    // Two rAFs: first schedules paint, second reads after paint
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       const c = div.querySelector('canvas');
-      try { const url = c ? c.toDataURL('image/png') : null; document.body.removeChild(div); resolve(url); }
-      catch(e) { document.body.removeChild(div); resolve(null); }
-    });
+      if (c && c.width > 0) {
+        try { const url = c.toDataURL('image/png'); document.body.removeChild(div); resolve(url); return; }
+        catch(e) {}
+      }
+      // Fallback: img element (some browsers)
+      const img = div.querySelector('img');
+      document.body.removeChild(div);
+      resolve(img && img.src && img.src.startsWith('data:') ? img.src : null);
+    }));
   });
 }
 
@@ -2923,23 +2935,38 @@ async function generateCredentialImage(member, ev) {
       });
     } catch(e) { document.body.removeChild(div); resolve(null); return; }
 
-    // Give browser one frame to paint the canvas
-    requestAnimationFrame(() => {
+    // Two rAFs: first schedules paint, second reads after canvas is painted
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       const c = div.querySelector('canvas');
-      try {
-        const url = c ? c.toDataURL('image/png') : null;
-        document.body.removeChild(div);
-        resolve(url);
-      } catch(e) { document.body.removeChild(div); resolve(null); }
-    });
+      if (c && c.width > 0) {
+        try {
+          const url = c.toDataURL('image/png');
+          document.body.removeChild(div);
+          resolve(url);
+          return;
+        } catch(e) {}
+      }
+      // Fallback: qrcodejs may render an <img> in some browsers
+      const img = div.querySelector('img');
+      document.body.removeChild(div);
+      resolve(img && img.src && img.src.startsWith('data:') ? img.src : null);
+    }));
   });
 
   // Step 2 — build Fabric canvas: replace text placeholders, embed QR image
   return new Promise(resolve => {
     const tmpEl = document.createElement('canvas');
-    tmpEl.style.display = 'none';
+    // IMPORTANT: visibility:hidden (not display:none) — Fabric needs the canvas in the
+    // render tree so images load and paint correctly.
+    tmpEl.style.cssText = 'visibility:hidden;position:fixed;top:0;left:0;z-index:-1;';
     document.body.appendChild(tmpEl);
     const tmpFab = new fabric.Canvas(tmpEl, { width: DS_W, height: DS_H });
+
+    const cleanup = (url) => {
+      try { tmpFab.dispose(); } catch(e) {}
+      try { document.body.removeChild(tmpEl); } catch(e) {}
+      resolve(url);
+    };
 
     tmpFab.loadFromJSON(template, () => {
       let qrObj = null;
@@ -2962,17 +2989,20 @@ async function generateCredentialImage(member, ev) {
       });
 
       const finishAndExport = () => {
-        tmpFab.renderAll();
-        const url = tmpFab.toDataURL({ multiplier: 2, format: 'png' });
-        tmpFab.dispose();
-        document.body.removeChild(tmpEl);
-        resolve(url);
+        // Two rAFs: let all images (including library images) fully paint before capture
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          tmpFab.renderAll();
+          try {
+            const url = tmpFab.toDataURL({ multiplier: 2, format: 'png' });
+            cleanup(url);
+          } catch(e) { cleanup(null); }
+        }));
       };
 
       if (qrDataUrl && qrObj) {
         // Embed real QR as fabric.Image at exact placeholder position
-        const qLeft  = qrObj.left  || (DS_W/2 - 45);
-        const qTop   = qrObj.top   || 148;
+        const qLeft   = qrObj.left  || (DS_W/2 - 45);
+        const qTop    = qrObj.top   || 148;
         const qWidth  = (qrObj.width  || 90) * (qrObj.scaleX || 1);
         const qHeight = (qrObj.height || 90) * (qrObj.scaleY || 1);
 
@@ -2986,7 +3016,7 @@ async function generateCredentialImage(member, ev) {
         });
         tmpFab.add(whiteBg);
 
-        // QR image
+        // QR image on top
         fabric.Image.fromURL(qrDataUrl, fImg => {
           fImg.set({
             left: qLeft + 4, top: qTop + 4,
