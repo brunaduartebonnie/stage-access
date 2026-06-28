@@ -594,6 +594,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 }
 .ds-pill:hover{border-color:#2259e0;color:#2259e0;background:rgba(34,89,224,.07);}
 .ds-pill.ph{border-color:rgba(34,89,224,.25);color:#2259e0;background:rgba(34,89,224,.06);}
+.ds-pill.ds-mode-edit{border-color:#2259e0;background:#2259e0;color:#fff;}
+.ds-pill.ds-mode-edit:hover{background:#1a47c0;}
 .ds-pill.file-btn{position:relative;overflow:hidden;}
 .ds-pill.file-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;}
 .ds-toggle{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:var(--text);}
@@ -1505,6 +1507,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       <button class="ds-pill" onclick="dsAddQR()">＋ QR</button>
       <button class="ds-pill" onclick="dsAddBarcode()">＋ Barcode</button>
       <button class="ds-pill ph" onclick="dsAddPhotoPlaceholder()">＋ Foto</button>
+    </div>
+    <div class="ds-opt-sep"></div>
+    <div class="ds-opt-group">
+      <span class="ds-opt-label">Modo</span>
+      <button id="ds-mode-btn" class="ds-pill ds-mode-edit" onclick="dsToggleMode()" title="Alternar entre mover e editar elementos">✏️ Editar</button>
     </div>
     <div class="ds-opt-sep"></div>
     <button class="ds-pill" onclick="dsClearAll()" style="color:var(--red)">🗑 Limpar</button>
@@ -3668,7 +3675,11 @@ function dsInit() {
     width: DS_W, height: DS_H,
     backgroundColor: '#1a2040',
     preserveObjectStacking: true,
+    allowTouchScrolling: false,
+    enablePointerEvents: true,
   });
+  dsEditMode = true;
+  dsApplyMode();
   document.getElementById('ds-bg-color').value = '#1a2040';
 
   if (ev && ev.credentialTemplate) {
@@ -3690,7 +3701,7 @@ function dsInit() {
   }
 
   ds.on('object:modified', dsUpdateLayers);
-  ds.on('object:added', dsUpdateLayers);
+  ds.on('object:added', e => { dsUpdateLayers(); dsApplyMode(); });
   ds.on('object:removed', dsUpdateLayers);
   ds.on('selection:created', dsUpdateProps);
   ds.on('selection:updated', dsUpdateProps);
@@ -3850,6 +3861,36 @@ function dsLibRemove(e, id) {
 }
 
 // ── BACKGROUND ──
+let dsEditMode = true; // true = editar/selecionar, false = mover
+
+function dsToggleMode() {
+  dsEditMode = !dsEditMode;
+  dsApplyMode();
+}
+
+function dsApplyMode() {
+  if (!ds) return;
+  const btn = document.getElementById('ds-mode-btn');
+  if (dsEditMode) {
+    // Modo editar: objetos são selecionáveis e editáveis mas não arrastam facilmente no touch
+    ds.getObjects().forEach(o => {
+      o.set({ lockMovementX: true, lockMovementY: true, selectable: true, evented: true });
+    });
+    ds.selection = true;
+    if (btn) { btn.textContent = '✏️ Editar'; btn.style.background = 'var(--blue)'; btn.style.color = '#fff'; }
+  } else {
+    // Modo mover: objetos podem ser arrastados
+    ds.getObjects().forEach(o => {
+      const isFixed = o.customType === 'border';
+      o.set({ lockMovementX: isFixed, lockMovementY: isFixed, selectable: !isFixed, evented: !isFixed });
+    });
+    ds.selection = true;
+    if (btn) { btn.textContent = '↕️ Mover'; btn.style.background = 'var(--surface2)'; btn.style.color = 'var(--text)'; }
+  }
+  ds.discardActiveObject();
+  ds.renderAll();
+}
+
 function dsSetBgColor(c) { if (!ds) return; ds.backgroundColor = c; ds.renderAll(); }
 
 function dsAddBgImage(input) {
