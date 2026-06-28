@@ -823,6 +823,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
   <div class="page-content">
     <div class="section-header" style="margin-top:8px">
       <span class="section-title">Os Meus Eventos</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" id="dash-tab-active" onclick="setDashTab('active')" style="font-size:12px;font-weight:700;color:var(--blue)">Activos</button>
+        <button class="btn btn-ghost btn-sm" id="dash-tab-archived" onclick="setDashTab('archived')" style="font-size:12px;color:var(--text-muted)">Arquivo</button>
+      </div>
     </div>
     <div id="events-list">
       <div class="empty-state">
@@ -956,6 +960,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       Eventos
     </button>
     <div class="topbar-title" id="event-detail-name">—</div>
+    <button class="btn btn-ghost btn-icon btn-sm" id="btn-archive-event" onclick="toggleArchiveEvent()" title="Arquivar evento">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+    </button>
     <button class="btn btn-ghost btn-icon btn-sm" onclick="editCurrentEvent()" title="Editar evento">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
     </button>
@@ -1231,6 +1238,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         </div>
         <div id="member-detail-info"></div>
       </div>
+
+      <!-- ENTRY HISTORY -->
+      <div class="card" style="width:100%;margin-top:12px;" id="member-history-card">
+        <div class="card-header">
+          <span class="card-title">Histórico de Entradas</span>
+        </div>
+        <div id="member-history-list"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1308,6 +1323,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       </div>
       <div class="scan-detail" id="scan-result-event">—</div>
       <div class="scan-detail" id="scan-result-msg" style="margin-top:8px;font-weight:600"></div>
+      <div id="scan-note-wrap" style="display:none;margin-top:12px;width:100%;">
+        <input id="scan-note-input" class="form-input" type="text" placeholder="Nota (opcional)..." style="font-size:13px;border-radius:8px;">
+      </div>
       <button class="scan-dismiss" onclick="dismissScanResult()">Continuar</button>
     </div>
   </div>
@@ -1570,14 +1588,14 @@ const fromDBEvent = r => ({
   accentColor: r.accent_color, eventLogoData: r.event_logo_data,
   artistLogoData: r.artist_logo_data, customAccessTypes: r.custom_access_types || [],
   sessionToken: r.session_token, createdAt: r.created_at,
-  gates: r.gates || [],
+  gates: r.gates || [], archived: r.archived || false,
 });
 const toDBEvent = ev => ({
   id: ev.id, name: ev.name, date: ev.date || null, venue: ev.venue || null,
   artist: ev.artist || null, accent_color: ev.accentColor || '#2259e0',
   event_logo_data: ev.eventLogoData || null, artist_logo_data: ev.artistLogoData || null,
   custom_access_types: ev.customAccessTypes || [], session_token: ev.sessionToken,
-  created_at: ev.createdAt || Date.now(), gates: ev.gates || [],
+  created_at: ev.createdAt || Date.now(), gates: ev.gates || [], archived: ev.archived || false,
 });
 const fromDBStaff = r => ({
   id: r.id, eventId: r.event_id, name: r.name, role: r.role, email: r.email,
@@ -1594,7 +1612,7 @@ const toDBStaff = m => ({
   days: m.days || [], schedule: m.schedule || null, issued_at: m.issuedAt || null,
   photo: m.photo || null, company: m.company || null,
 });
-const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: r.event_id, ts: r.ts, gate: r.gate || null });
+const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: r.event_id, ts: r.ts, gate: r.gate || null, note: r.note || null });
 
 // ════════════════════════════════════════════════════════
 //  STATE (in-memory cache)
@@ -1673,7 +1691,7 @@ async function deleteStaffById(id) {
 
 async function insertCheckin(ck) {
   const { error } = await db.from('checkins').insert({
-    id: ck.id, credential_id: ck.credentialId, event_id: ck.eventId, ts: ck.ts, gate: ck.gate || null,
+    id: ck.id, credential_id: ck.credentialId, event_id: ck.eventId, ts: ck.ts, gate: ck.gate || null, note: ck.note || null,
   });
   if (error) throw error;
   state.checkins.unshift(ck);
@@ -1746,23 +1764,36 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 // ════════════════════════════════════════════════════════
 //  EVENTS
 // ════════════════════════════════════════════════════════
+let dashTab = 'active'; // 'active' | 'archived'
+
+function setDashTab(tab) {
+  dashTab = tab;
+  document.getElementById('dash-tab-active').style.color   = tab === 'active'   ? 'var(--blue)' : 'var(--text-muted)';
+  document.getElementById('dash-tab-active').style.fontWeight   = tab === 'active'   ? '700' : '400';
+  document.getElementById('dash-tab-archived').style.color = tab === 'archived' ? 'var(--blue)' : 'var(--text-muted)';
+  document.getElementById('dash-tab-archived').style.fontWeight = tab === 'archived' ? '700' : '400';
+  renderDashboard();
+}
+
 function renderDashboard() {
   const list = document.getElementById('events-list');
-  if (!state.events.length) {
+  const filtered = state.events.filter(ev => dashTab === 'archived' ? ev.archived : !ev.archived);
+  if (!filtered.length) {
     list.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <p>Nenhum evento criado</p><small>Clica em "Novo Evento" para começar</small>
+      <p>${dashTab === 'archived' ? 'Nenhum evento arquivado' : 'Nenhum evento criado'}</p>
+      <small>${dashTab === 'archived' ? 'Os eventos arquivados aparecem aqui' : 'Clica em "Novo Evento" para começar'}</small>
     </div>`;
     return;
   }
-  list.innerHTML = state.events.map(ev => {
+  list.innerHTML = filtered.map(ev => {
     const memberCount = state.staff.filter(s => s.eventId === ev.id).length;
     const checkinCount = state.checkins.filter(c => c.eventId === ev.id).length;
     const dateStr = ev.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'short',year:'numeric'}) : 'Data a definir';
     return `<div class="list-item" onclick="openEvent('${ev.id}')">
       <div class="list-item-avatar">${ev.eventLogoData ? `<img src="${ev.eventLogoData}">` : `<span style="font-size:20px">${(ev.name||'?')[0].toUpperCase()}</span>`}</div>
       <div class="list-item-body">
-        <div class="list-item-name">${esc(ev.name)}</div>
+        <div class="list-item-name">${esc(ev.name)}${ev.archived ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:400">[arquivado]</span>' : ''}</div>
         <div class="list-item-sub">${esc(ev.artist||'—')} · ${dateStr}</div>
       </div>
       <div class="list-item-right">
@@ -1772,6 +1803,24 @@ function renderDashboard() {
       </div>
     </div>`;
   }).join('');
+}
+
+async function toggleArchiveEvent() {
+  const ev = state.events.find(e => e.id === currentEventId);
+  if (!ev) return;
+  const willArchive = !ev.archived;
+  if (!confirm(willArchive ? 'Arquivar este evento?' : 'Desarquivar este evento?')) return;
+  ev.archived = willArchive;
+  showLoading(willArchive ? 'A arquivar…' : 'A desarquivar…');
+  try {
+    await upsertEvent(ev);
+    toast(willArchive ? 'Evento arquivado' : 'Evento activo', 'success');
+    // Update archive button icon colour
+    const btn = document.getElementById('btn-archive-event');
+    if (btn) btn.style.color = ev.archived ? 'var(--gold)' : '';
+    if (willArchive) showView('dashboard');
+  } catch(e) { toast('Erro', 'error'); ev.archived = !willArchive; }
+  hideLoading();
 }
 
 function openEvent(id) {
@@ -1999,6 +2048,9 @@ function renderEventDetail() {
 
   document.getElementById('event-detail-name').textContent = ev.name;
   document.getElementById('event-detail-artist').textContent = ev.artist || ev.name;
+  // Archive button colour
+  const archBtn = document.getElementById('btn-archive-event');
+  if (archBtn) { archBtn.style.color = ev.archived ? 'var(--gold)' : ''; archBtn.title = ev.archived ? 'Desarquivar evento' : 'Arquivar evento'; }
   const dateStr = ev.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'}) : '';
   document.getElementById('event-detail-meta').textContent = [ev.venue, dateStr].filter(Boolean).join(' · ');
 
@@ -2587,6 +2639,31 @@ async function renderCredential() {
       ${member.notes ? `<div style="grid-column:1/-1">${infoRow('Notas', member.notes)}</div>` : ''}
     </div>
   `;
+
+  // Entry history
+  const histCard = document.getElementById('member-history-card');
+  const histList = document.getElementById('member-history-list');
+  const memberCheckins = state.checkins
+    .filter(c => c.credentialId === member.credentialId && c.eventId === member.eventId)
+    .sort((a,b) => b.ts - a.ts);
+  if (!memberCheckins.length) {
+    histCard.style.display = 'none';
+  } else {
+    histCard.style.display = '';
+    histList.innerHTML = memberCheckins.map(c => {
+      const dt = new Date(c.ts);
+      const dateStr = dt.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'});
+      const timeStr = dt.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--green);flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${dateStr} às ${timeStr}</div>
+          ${c.gate ? `<div style="font-size:11px;color:var(--text-muted)">${esc(c.gate)}</div>` : ''}
+          ${c.note ? `<div style="font-size:11px;color:var(--text2);font-style:italic">"${esc(c.note)}"</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
 }
 
 // QR data URL — renders into a fixed visible element so canvas paints correctly
@@ -2880,7 +2957,8 @@ function handleCredentialScan(text, ev) {
     }
 
     // Valid!
-    const ck = { id: uid(), credentialId: data.credId, eventId: ev.id, ts: Date.now(), gate: activeGate || null };
+    const ck = { id: uid(), credentialId: data.credId, eventId: ev.id, ts: Date.now(), gate: activeGate || null, note: null };
+    lastCheckinId = ck.id;
     // Save offline-first: add to local state immediately, sync in background
     if (!state.checkins.find(c => c.id === ck.id)) state.checkins.unshift(ck);
     saveOfflineCheckins(ev.id);
@@ -2924,9 +3002,27 @@ function showScanResult(type, name, role, msg, access, eventName, company) {
   const accessEl = document.getElementById('scan-result-access');
   accessEl.textContent = access || '';
   accessEl.style.display = access ? '' : 'none';
+
+  // Show note field only on valid scan
+  const noteWrap = document.getElementById('scan-note-wrap');
+  const noteInput = document.getElementById('scan-note-input');
+  if (type === 'valid') { noteWrap.style.display = ''; noteInput.value = ''; }
+  else { noteWrap.style.display = 'none'; }
 }
 
+let lastCheckinId = null; // id of the most recent checkin, so note can be attached
+
 function dismissScanResult() {
+  // Save note if there's one and we have a recent valid checkin
+  const note = (document.getElementById('scan-note-input')?.value || '').trim();
+  if (note && lastCheckinId) {
+    const ck = state.checkins.find(c => c.id === lastCheckinId);
+    if (ck) {
+      ck.note = note;
+      db.from('checkins').update({ note }).eq('id', lastCheckinId).then(() => {});
+    }
+  }
+  lastCheckinId = null;
   document.getElementById('scan-result-overlay').className = 'scan-result-overlay';
 }
 
