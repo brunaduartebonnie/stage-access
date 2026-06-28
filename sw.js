@@ -1,4 +1,4 @@
-const CACHE = 'stage-access-v1';
+const CACHE = 'stage-access-v2';
 const OFFLINE_URLS = [
   '/',
   '/index.html',
