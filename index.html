@@ -866,6 +866,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Gerir Utilizadores
         </button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:10px;" onclick="openProfile();toggleUserMenu();">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Editar Perfil
+        </button>
         <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:10px;" onclick="toggleDarkMode()">
           <svg id="dark-mode-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           <span id="dark-mode-label">Modo Escuro</span>
@@ -1622,9 +1626,35 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       </button>
       <button class="btn btn-secondary btn-lg" onclick="exportPrintView()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        Imprimir / PDF
+        Imprimir lista / PDF
+      </button>
+      <button class="btn btn-secondary btn-lg" onclick="exportPresencePDF()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Relatório de Presenças / PDF
       </button>
     </div>
+  </div>
+</div>
+
+<!-- Profile Modal -->
+<div class="modal-overlay" id="modal-profile">
+  <div class="modal" style="max-width:360px;width:100%">
+    <button class="modal-close" onclick="closeModal('modal-profile')">✕</button>
+    <div class="modal-title">O Meu Perfil</div>
+    <div class="form-group">
+      <label class="form-label">Nome</label>
+      <input id="profile-name" class="form-input" type="text" placeholder="O teu nome">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nova Password</label>
+      <input id="profile-password" class="form-input" type="password" placeholder="Deixa em branco para não alterar">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirmar Password</label>
+      <input id="profile-password2" class="form-input" type="password" placeholder="Repete a nova password">
+    </div>
+    <div id="profile-feedback" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:12px;"></div>
+    <button class="btn btn-primary btn-lg" style="width:100%" onclick="saveProfile()">Guardar alterações</button>
   </div>
 </div>
 
@@ -3471,18 +3501,21 @@ function getExportData() {
 
 function exportCSV() {
   const { ev, groups, sorted } = getExportData();
-  const rows = [['Função','Nome','Acesso','Código','Horário','Dias','Email','Telefone']];
+  const rows = [['Função','Nome','Empresa','Acesso','Código','Estado','Horário','Dias','Email','Telefone','Alerta Scanner']];
   sorted.forEach(role => {
     groups[role].forEach(m => {
       rows.push([
         role,
         m.name,
+        m.company || '',
         m.access || '',
         m.credentialId || '',
+        m.blocked ? 'Bloqueado' : 'Ativo',
         m.schedule || '',
         (m.days||[]).join(', '),
         m.email || '',
         m.phone || '',
+        m.scanAlert || '',
       ]);
     });
   });
@@ -3566,8 +3599,87 @@ function exportPrintView() {
   closeModal('modal-export');
 }
 
+function exportPresencePDF() {
+  const ev = state.events.find(e => e.id === currentEventId);
+  const members = state.staff.filter(s => s.eventId === currentEventId);
+  const checkins = state.checkins.filter(c => c.eventId === currentEventId);
+  const evName = ev ? ev.name : 'Evento';
+  const dateStr = ev?.date ? new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'}) : '';
+
+  // Build presence table: all members + whether they checked in
+  const sorted = [...members].sort((a,b) => a.name.localeCompare(b.name));
+  const rows = sorted.map((m, i) => {
+    const ck = checkins.find(c => c.credentialId === m.credentialId);
+    const inTime = ck ? new Date(ck.ts).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const status = ck ? '✓' : '✗';
+    const statusColor = ck ? '#27ae60' : '#e05555';
+    return `<tr>
+      <td class="pg-num">${i+1}</td>
+      <td>${m.name}${m.company ? `<br><small style="color:#888">${m.company}</small>` : ''}</td>
+      <td>${m.role || '—'}</td>
+      <td><span class="pg-badge">${m.access||'—'}</span></td>
+      <td style="color:${statusColor};font-weight:800;font-size:16px;text-align:center">${status}</td>
+      <td style="font-family:monospace">${inTime}</td>
+      <td>${ck?.gate || '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const total = members.length;
+  const present = checkins.filter((c,i,a) => a.findIndex(x=>x.credentialId===c.credentialId)===i).length;
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html lang="pt"><head>
+    <meta charset="UTF-8">
+    <title>${evName} — Relatório de Presenças</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;color:#111;padding:32px 40px;}
+      .pg-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:14px;border-bottom:2px solid #111;}
+      .pg-event{font-size:18px;font-weight:800;}
+      .pg-sub{font-size:11px;color:#555;margin-top:4px;}
+      .pg-stats{display:flex;gap:24px;margin-bottom:20px;}
+      .pg-stat{background:#f5f5f5;border-radius:8px;padding:10px 16px;text-align:center;}
+      .pg-stat-num{font-size:24px;font-weight:800;}
+      .pg-stat-label{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px;}
+      .pg-table{width:100%;border-collapse:collapse;}
+      .pg-table th{background:#1a1a1a;color:#fff;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:7px 10px;text-align:left;}
+      .pg-table td{padding:7px 10px;border-bottom:1px solid #eee;vertical-align:middle;}
+      .pg-table tr:nth-child(even) td{background:#fafafa;}
+      .pg-num{color:#999;font-size:10px;width:24px;}
+      .pg-badge{background:#1a1a1a;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:99px;text-transform:uppercase;}
+      .pg-footer{margin-top:24px;padding-top:10px;border-top:1px solid #ddd;font-size:10px;color:#999;display:flex;justify-content:space-between;}
+      @media print{body{padding:16px;}@page{margin:12mm;}}
+    </style>
+  </head><body>
+    <div class="pg-header">
+      <div>
+        <div class="pg-event">RELATÓRIO DE PRESENÇAS — ${evName.toUpperCase()}</div>
+        <div class="pg-sub">${dateStr}${ev?.venue ? ' · ' + ev.venue : ''}</div>
+      </div>
+      <div style="text-align:right;font-size:11px;color:#555">Gerado em ${new Date().toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+    </div>
+    <div class="pg-stats">
+      <div class="pg-stat"><div class="pg-stat-num">${total}</div><div class="pg-stat-label">Credenciados</div></div>
+      <div class="pg-stat"><div class="pg-stat-num" style="color:#27ae60">${present}</div><div class="pg-stat-label">Presentes</div></div>
+      <div class="pg-stat"><div class="pg-stat-num" style="color:#e05555">${total-present}</div><div class="pg-stat-label">Ausentes</div></div>
+      <div class="pg-stat"><div class="pg-stat-num">${total>0?Math.round(present/total*100):0}%</div><div class="pg-stat-label">Presença</div></div>
+    </div>
+    <table class="pg-table">
+      <thead><tr><th>#</th><th>Nome</th><th>Função</th><th>Acesso</th><th style="text-align:center">✓</th><th>Hora Entrada</th><th>Portão</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="pg-footer">
+      <span>Stage Access · Relatório gerado automaticamente</span>
+      <span>${present} de ${total} presentes</span>
+    </div>
+    <script>window.onload=()=>window.print();<\/script>
+  </body></html>`);
+  win.document.close();
+  closeModal('modal-export');
+}
+
 function downloadCSVTemplate() {
-  const csv = 'nome,funcao,email,telefone,acesso\nJoão Silva,Production Manager,joao@email.com,+351912345678,All Access\nMaria Santos,Press,maria@media.pt,+351961234567,Press / Media\n';
+  const csv = 'nome,funcao,empresa,email,telefone,acesso,horario,alerta\nJoão Silva,Production Manager,Stage Events,joao@email.com,+351912345678,All Access,09:00 – 23:00,\nMaria Santos,Press,Jornal Público,maria@media.pt,+351961234567,Press / Media,,Verificar cartão de imprensa\n';
   const blob = new Blob([csv], { type: 'text/csv' });
   const link = document.createElement('a');
   link.download = 'staff-template.csv';
@@ -3632,24 +3744,27 @@ function parseCSV(text) {
     let access = getCol(line, 'acesso', 'access') || 'All Access';
     if (!validAccess.includes(access)) access = 'All Access';
 
+    const role = getCol(line, 'func', 'role', 'cargo');
+    const company = getCol(line, 'empresa', 'company');
+    const scanAlert = getCol(line, 'alerta', 'alert', 'scan_alert') || null;
+    const schedule = getCol(line, 'horario', 'schedule', 'horário') || '';
     const credId = 'CRED-' + uid(8).toUpperCase();
     const member = {
       id: uid(),
       eventId: currentEventId,
-      name,
-      role: getCol(line, 'func', 'role', 'cargo'),
+      name, role, company,
       email: getCol(line, 'email'),
       phone: getCol(line, 'telef', 'phone', 'tel'),
       notes: '',
-      access,
+      access, schedule, scanAlert,
+      days: [],
+      blocked: false,
       credentialId: credId,
       credentialQRData: JSON.stringify({
         type: 'stage-access-credential',
         credId,
         eventId: currentEventId,
-        name,
-        role: getCol(line, 'func', 'role', 'cargo'),
-        access,
+        name, role, access,
         issued: Date.now(),
       }),
       createdAt: Date.now(),
@@ -4372,6 +4487,54 @@ function updateUserMenuUI() {
 function toggleUserMenu() {
   const m = document.getElementById('user-menu');
   m.style.display = m.style.display === 'none' ? '' : 'none';
+}
+
+// ── PROFILE ──────────────────────────────────────────────
+function openProfile() {
+  document.getElementById('profile-name').value = currentUser?.name || '';
+  document.getElementById('profile-password').value = '';
+  document.getElementById('profile-password2').value = '';
+  const fb = document.getElementById('profile-feedback');
+  fb.style.display = 'none';
+  openModal('modal-profile');
+}
+
+async function saveProfile() {
+  const name = document.getElementById('profile-name').value.trim();
+  const pw1  = document.getElementById('profile-password').value;
+  const pw2  = document.getElementById('profile-password2').value;
+  const fb   = document.getElementById('profile-feedback');
+
+  if (!name) { showProfileFeedback('O nome não pode estar vazio.', 'error'); return; }
+  if (pw1 && pw1 !== pw2) { showProfileFeedback('As passwords não coincidem.', 'error'); return; }
+  if (pw1 && pw1.length < 6) { showProfileFeedback('A password deve ter pelo menos 6 caracteres.', 'error'); return; }
+
+  try {
+    // Update name in user_profiles
+    await db.from('user_profiles').update({ name }).eq('id', currentUser.id);
+    currentUser.name = name;
+
+    // Update password if provided
+    if (pw1) {
+      const { error } = await db.auth.updateUser({ password: pw1 });
+      if (error) throw error;
+    }
+
+    updateUserMenuUI();
+    showProfileFeedback('Perfil atualizado com sucesso!', 'success');
+    setTimeout(() => closeModal('modal-profile'), 1200);
+  } catch(e) {
+    showProfileFeedback('Erro: ' + (e.message || 'tenta novamente'), 'error');
+  }
+}
+
+function showProfileFeedback(msg, type) {
+  const fb = document.getElementById('profile-feedback');
+  fb.textContent = msg;
+  fb.style.display = '';
+  fb.style.background = type === 'success' ? 'rgba(76,175,130,.15)' : 'rgba(224,85,85,.15)';
+  fb.style.color = type === 'success' ? 'var(--green)' : 'var(--red)';
+  fb.style.border = `1px solid ${type === 'success' ? 'var(--green)' : 'var(--red)'}`;
 }
 document.addEventListener('click', e => {
   const btn = document.getElementById('user-menu-btn');
