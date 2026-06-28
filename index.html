@@ -1071,6 +1071,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
     <div class="tabs">
       <button class="tab active" onclick="switchTab('staff',this)">Staff</button>
       <button class="tab" onclick="switchTab('checkins',this)">Check-ins</button>
+      <button class="tab" onclick="switchTab('activity',this)">Atividade</button>
     </div>
 
     <!-- STAFF TAB -->
@@ -1119,6 +1120,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         <button class="btn btn-danger btn-sm" onclick="clearCheckins()">Limpar</button>
       </div>
       <div id="checkins-list"></div>
+    </div>
+
+    <!-- ACTIVITY TAB -->
+    <div id="tab-activity" style="display:none">
+      <div class="section-header" style="margin-top:0">
+        <span class="section-title">Histórico de Atividade</span>
+        <button class="btn btn-ghost btn-sm" style="color:var(--text-muted);font-size:11px;" onclick="clearActivityLog()">Limpar log</button>
+      </div>
+      <div id="activity-list"></div>
     </div>
   </div>
 </div>
@@ -2235,6 +2245,8 @@ function renderEventDetail() {
   const ev = state.events.find(e => e.id === currentEventId);
   if (!ev) { showView('dashboard'); return; }
   subscribeCheckins(currentEventId);
+  // Always refresh offline cache when viewing event (ensures scanner works offline)
+  saveOfflineStaff(currentEventId);
 
   document.getElementById('event-detail-name').textContent = ev.name;
   document.getElementById('event-detail-artist').textContent = ev.artist || ev.name;
@@ -2459,6 +2471,8 @@ function switchTab(tab, btn) {
   btn.classList.add('active');
   document.getElementById('tab-staff').style.display = tab === 'staff' ? '' : 'none';
   document.getElementById('tab-checkins').style.display = tab === 'checkins' ? '' : 'none';
+  document.getElementById('tab-activity').style.display = tab === 'activity' ? '' : 'none';
+  if (tab === 'activity') renderActivityLog();
 }
 
 // ── HOURLY CHART ──────────────────────────────────────
@@ -2765,6 +2779,9 @@ async function saveMember() {
   showLoading('A guardar membro…');
   try {
     await upsertStaff(member);
+    const isEdit = !!editingMemberId;
+    logActivity(currentEventId, isEdit ? 'membro_editado' : 'membro_criado',
+      `${isEdit ? 'Editado' : 'Criado'}: ${member.name} (${member.access})`);
     editingMemberId = null;
     currentMemberId = member.id;
     toast('Membro guardado!', 'success');
@@ -2822,9 +2839,11 @@ async function duplicateCurrentMember() {
 
 async function deleteCurrentMember() {
   if (!confirm('Eliminar este membro e a sua credencial?')) return;
+  const m = state.staff.find(s => s.id === currentMemberId);
   showLoading('A eliminar…');
   try {
     await deleteStaffById(currentMemberId);
+    if (m) logActivity(currentEventId, 'membro_eliminado', `Eliminado: ${m.name} (${m.access})`);
     currentMemberId = null;
     toast('Membro eliminado');
     showView('event-detail');
@@ -3137,6 +3156,7 @@ function sendViaWhatsApp() {
   const phone = member?.phone ? member.phone.replace(/\D/g,'') : '';
   const url = `https://wa.me/${phone}?text=${encodeURIComponent(body)}`;
   window.open(url, '_blank');
+  if (member) logActivity(member.eventId, 'credencial_enviada', `WhatsApp → ${member.name}`);
   closeModal('modal-send-credential');
 }
 
@@ -3145,6 +3165,7 @@ function sendViaEmail() {
   const { subject, body } = _buildCredentialMessage();
   const mailto = `mailto:${encodeURIComponent(member?.email||'')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailto, '_blank');
+  if (member) logActivity(member.eventId, 'credencial_enviada', `Email → ${member.name}`);
   closeModal('modal-send-credential');
 }
 
@@ -3209,9 +3230,21 @@ function startEntryScanner() {
 
   // Show offline banner if no network
   const offlineBanner = document.getElementById('offline-banner');
-  if (offlineBanner) offlineBanner.style.display = navigator.onLine ? 'none' : '';
+  const cachedCount = loadOfflineStaff(currentEventId || '').length;
+  if (offlineBanner) {
+    offlineBanner.style.display = navigator.onLine ? 'none' : '';
+    if (!navigator.onLine && cachedCount > 0) {
+      offlineBanner.textContent = `📶 OFFLINE — A usar cache local (${cachedCount} credenciais). Entradas guardadas localmente.`;
+    }
+  }
   window.addEventListener('online',  () => { if(offlineBanner) offlineBanner.style.display='none'; });
-  window.addEventListener('offline', () => { if(offlineBanner) offlineBanner.style.display=''; });
+  window.addEventListener('offline', () => {
+    if(offlineBanner) {
+      offlineBanner.style.display='';
+      const n = loadOfflineStaff(currentEventId || '').length;
+      offlineBanner.textContent = `📶 OFFLINE — A usar cache local (${n} credenciais). Entradas guardadas localmente.`;
+    }
+  });
 
   entryHtml5QrCode = new Html5Qrcode('entry-qr-reader');
   entryHtml5QrCode.start(
@@ -3444,6 +3477,8 @@ function playBeep(type) {
 
 // ── OFFLINE CACHE ──────────────────────────────────────────
 function offlineCacheKey(eventId) { return 'sa_checkins_' + eventId; }
+function offlineStaffKey(eventId) { return 'sa_staff_' + eventId; }
+function offlineEventKey(eventId) { return 'sa_event_' + eventId; }
 
 function saveOfflineCheckins(eventId) {
   const ckIds = state.checkins.filter(c => c.eventId === eventId).map(c => c.credentialId);
@@ -3458,6 +3493,93 @@ function loadOfflineCheckins(eventId) {
   } catch(e) { return []; }
 }
 
+// Cache full staff list for offline scanning
+function saveOfflineStaff(eventId) {
+  const members = state.staff.filter(s => s.eventId === eventId);
+  const ev = state.events.find(e => e.id === eventId);
+  try {
+    localStorage.setItem(offlineStaffKey(eventId), JSON.stringify(members));
+    if (ev) localStorage.setItem(offlineEventKey(eventId), JSON.stringify(ev));
+  } catch(e) {}
+}
+
+function loadOfflineStaff(eventId) {
+  try {
+    const raw = localStorage.getItem(offlineStaffKey(eventId));
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+
+function loadOfflineEvent(eventId) {
+  try {
+    const raw = localStorage.getItem(offlineEventKey(eventId));
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+// ── ACTIVITY LOG ──────────────────────────────────────────
+function activityLogKey(eventId) { return 'sa_activity_' + eventId; }
+
+function logActivity(eventId, action, detail) {
+  if (!eventId) return;
+  try {
+    const key = activityLogKey(eventId);
+    const raw = localStorage.getItem(key);
+    const log = raw ? JSON.parse(raw) : [];
+    log.unshift({
+      ts: Date.now(),
+      user: currentUser?.name || currentUser?.email || '?',
+      action,
+      detail: detail || '',
+    });
+    // Keep last 200 entries
+    if (log.length > 200) log.length = 200;
+    localStorage.setItem(key, JSON.stringify(log));
+  } catch(e) {}
+}
+
+function renderActivityLog() {
+  const el = document.getElementById('activity-list');
+  if (!el) return;
+  try {
+    const raw = localStorage.getItem(activityLogKey(currentEventId));
+    const log = raw ? JSON.parse(raw) : [];
+    if (!log.length) {
+      el.innerHTML = '<div class="empty-state"><p>Nenhuma atividade registada</p></div>';
+      return;
+    }
+    el.innerHTML = log.map(entry => {
+      const date = new Date(entry.ts);
+      const timeStr = date.toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      const icon = activityIcon(entry.action);
+      return `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="width:30px;height:30px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);">${esc(entry.detail)}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${esc(entry.user)} · ${timeStr}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state"><p>Erro ao carregar atividade</p></div>';
+  }
+}
+
+function activityIcon(action) {
+  const icons = {
+    'membro_criado': '➕', 'membro_editado': '✏️', 'membro_eliminado': '🗑️',
+    'credencial_enviada': '📤', 'csv_importado': '📥', 'evento_criado': '🎪',
+    'evento_editado': '🎨', 'template_guardado': '🖼️', 'checkin': '✅',
+  };
+  return icons[action] || '📋';
+}
+
+function clearActivityLog() {
+  if (!confirm('Limpar todo o histórico de atividade?')) return;
+  try { localStorage.removeItem(activityLogKey(currentEventId)); } catch(e) {}
+  renderActivityLog();
+}
+
 // Called when scanner loads — merge offline cache with live state
 function mergeOfflineCheckins(eventId) {
   const cached = loadOfflineCheckins(eventId);
@@ -3466,6 +3588,13 @@ function mergeOfflineCheckins(eventId) {
       state.checkins.unshift({ id: uid(), credentialId: credId, eventId, ts: Date.now() });
     }
   });
+  // If offline and state.staff is empty, restore from cache
+  if (!navigator.onLine && !state.staff.find(s => s.eventId === eventId)) {
+    const cached = loadOfflineStaff(eventId);
+    cached.forEach(m => { if (!state.staff.find(s => s.id === m.id)) state.staff.push(m); });
+    const ev = loadOfflineEvent(eventId);
+    if (ev && !state.events.find(e => e.id === eventId)) state.events.push(ev);
+  }
 }
 
 function exitScanner() {
@@ -3703,6 +3832,7 @@ function handleCSVUpload(input) {
     showLoading(`A importar ${result.members.length} membros…`);
     try {
       for (const m of result.members) await upsertStaff(m);
+      logActivity(currentEventId, 'csv_importado', `Importados ${result.members.length} membros via CSV`);
       fb.textContent = `${result.members.length} membro(s) importado(s) com sucesso!`;
       fb.className = 'import-feedback show success';
       setTimeout(() => { closeModal('modal-import-csv'); renderEventDetail(); }, 1200);
@@ -4305,7 +4435,11 @@ async function saveCredentialTemplate() {
   ev.credentialTemplate=ds.toJSON(['customType','placeholder','libId']);
   ev.credentialLibrary=dsLibrary;
   showLoading('A guardar template…');
-  try{await upsertEvent(ev);toast('Template guardado!','success');}
+  try{
+    await upsertEvent(ev);
+    logActivity(dsEventId, 'template_guardado', `Template de credencial atualizado`);
+    toast('Template guardado!','success');
+  }
   catch(e){toast('Erro ao guardar','error');}
   hideLoading();
 }
