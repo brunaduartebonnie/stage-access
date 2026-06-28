@@ -393,6 +393,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 .scan-result-overlay.show{display:flex;}
 .scan-result-overlay.valid{background:rgba(76,175,130,0.15);}
 .scan-result-overlay.invalid{background:rgba(224,85,85,0.15);}
+.scan-result-overlay.warn{background:rgba(255,193,7,0.12);}
 .scan-result-card{
   background:var(--surface);border-radius:var(--radius);
   padding:32px 24px;text-align:center;max-width:320px;width:100%;
@@ -400,6 +401,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 }
 .scan-result-card.valid{border-color:var(--green);box-shadow:0 0 40px rgba(76,175,130,0.3);}
 .scan-result-card.invalid{border-color:var(--red);box-shadow:0 0 40px rgba(224,85,85,0.3);}
+.scan-result-card.warn{border-color:var(--gold);box-shadow:0 0 40px rgba(255,193,7,0.3);}
+.scan-icon.warn{color:var(--gold);}
 .scan-icon{
   width:72px;height:72px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
@@ -1122,6 +1125,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       Início
     </button>
     <div class="topbar-title">Admin Check</div>
+  </div>
+  <!-- Offline banner -->
+  <div id="offline-banner" style="display:none;background:#f59e0b;color:#000;font-size:12px;font-weight:700;text-align:center;padding:6px;letter-spacing:.5px;">
+    📶 SEM LIGAÇÃO — A funcionar offline. Entradas guardadas localmente.
   </div>
   <div class="ac-scanner-prompt">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -2507,9 +2514,20 @@ function startAdminCheck() {
 
 function startEntryScanner() {
   document.getElementById('start-entry-scan-btn').style.display = 'none';
-  if (entryHtml5QrCode) {
-    entryHtml5QrCode.stop().catch(()=>{});
+  if (entryHtml5QrCode) entryHtml5QrCode.stop().catch(()=>{});
+
+  // Merge any checkins saved while offline
+  if (currentEventId) {
+    mergeOfflineCheckins(currentEventId);
+    saveOfflineCheckins(currentEventId);
   }
+
+  // Show offline banner if no network
+  const offlineBanner = document.getElementById('offline-banner');
+  if (offlineBanner) offlineBanner.style.display = navigator.onLine ? 'none' : '';
+  window.addEventListener('online',  () => { if(offlineBanner) offlineBanner.style.display='none'; });
+  window.addEventListener('offline', () => { if(offlineBanner) offlineBanner.style.display=''; });
+
   entryHtml5QrCode = new Html5Qrcode('entry-qr-reader');
   entryHtml5QrCode.start(
     { facingMode: 'environment' },
@@ -2581,23 +2599,29 @@ function handleCredentialScan(text, ev) {
       return;
     }
 
-    // Check duplicate
+    // Check duplicate — distinct "warning" state, not invalid
     const alreadyIn = state.checkins.find(c => c.credentialId === data.credId && c.eventId === ev.id);
     if (alreadyIn) {
       const t = new Date(alreadyIn.ts).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
-      showScanResult('invalid', member.name, member.role, `Já entrou às ${t}`);
+      playBeep('warn');
+      showScanResult('warn', member.name, member.role, `⚠️ Já entrou às ${t}`, member.access, ev.name);
       return;
     }
 
     // Valid!
     const ck = { id: uid(), credentialId: data.credId, eventId: ev.id, ts: Date.now() };
-    insertCheckin(ck).catch(()=>{});
+    // Save offline-first: add to local state immediately, sync in background
+    if (!state.checkins.find(c => c.id === ck.id)) state.checkins.unshift(ck);
+    saveOfflineCheckins(ev.id);
+    insertCheckin(ck).catch(() => { /* stays in offline queue */ });
     scanOkCount++;
     document.getElementById('scan-count-ok').textContent = scanOkCount;
+    playBeep('ok');
     showScanResult('valid', member.name, member.role, '✓ Entrada permitida', member.access, ev.name);
   } catch(e) {
     scanErrCount++;
     document.getElementById('scan-count-err').textContent = scanErrCount;
+    playBeep('err');
     showScanResult('invalid', null, null, 'QR inválido ou ilegível');
   }
 }
@@ -2613,6 +2637,8 @@ function showScanResult(type, name, role, msg, access, eventName) {
 
   if (type === 'valid') {
     icon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+  } else if (type === 'warn') {
+    icon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   } else {
     icon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
   }
@@ -2621,7 +2647,7 @@ function showScanResult(type, name, role, msg, access, eventName) {
   document.getElementById('scan-result-role').textContent = role || '';
   document.getElementById('scan-result-event').textContent = eventName || '';
   document.getElementById('scan-result-msg').textContent = msg || '';
-  document.getElementById('scan-result-msg').style.color = type === 'valid' ? 'var(--green)' : 'var(--red)';
+  document.getElementById('scan-result-msg').style.color = type === 'valid' ? 'var(--green)' : type === 'warn' ? 'var(--gold)' : 'var(--red)';
 
   const accessEl = document.getElementById('scan-result-access');
   accessEl.textContent = access || '';
@@ -2630,6 +2656,63 @@ function showScanResult(type, name, role, msg, access, eventName) {
 
 function dismissScanResult() {
   document.getElementById('scan-result-overlay').className = 'scan-result-overlay';
+}
+
+// ── BEEP (Web Audio API — no audio files needed) ──────────
+function playBeep(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    if (type === 'ok') {
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(); osc.stop(ctx.currentTime + 0.3);
+    } else if (type === 'warn') {
+      osc.frequency.setValueAtTime(600, ctx.currentTime);
+      osc.frequency.setValueAtTime(400, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(); osc.stop(ctx.currentTime + 0.35);
+      // vibrate on mobile
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    } else {
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(); osc.stop(ctx.currentTime + 0.4);
+      if (navigator.vibrate) navigator.vibrate(300);
+    }
+  } catch(e) {}
+}
+
+// ── OFFLINE CACHE ──────────────────────────────────────────
+function offlineCacheKey(eventId) { return 'sa_checkins_' + eventId; }
+
+function saveOfflineCheckins(eventId) {
+  const ckIds = state.checkins.filter(c => c.eventId === eventId).map(c => c.credentialId);
+  try { localStorage.setItem(offlineCacheKey(eventId), JSON.stringify(ckIds)); } catch(e) {}
+}
+
+function loadOfflineCheckins(eventId) {
+  try {
+    const raw = localStorage.getItem(offlineCacheKey(eventId));
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch(e) { return []; }
+}
+
+// Called when scanner loads — merge offline cache with live state
+function mergeOfflineCheckins(eventId) {
+  const cached = loadOfflineCheckins(eventId);
+  cached.forEach(credId => {
+    if (!state.checkins.find(c => c.credentialId === credId && c.eventId === eventId)) {
+      state.checkins.unshift({ id: uid(), credentialId: credId, eventId, ts: Date.now() });
+    }
+  });
 }
 
 function exitScanner() {
