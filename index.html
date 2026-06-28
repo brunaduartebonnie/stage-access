@@ -81,7 +81,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 .page-content.wide{max-width:900px;}
 
 /* ── LANDING ── */
-#view-landing{
+#view-landing, #view-login{
   background:var(--bg);
   justify-content:center;align-items:center;
   position:relative;overflow:hidden;
@@ -680,9 +680,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 ══════════════════════════════════════════════ -->
 <div id="view-login" class="view">
   <div class="landing-bg"></div>
-  <div class="landing-inner" style="justify-content:center;">
+  <div class="landing-inner">
     <div style="width:100%;max-width:360px;padding:24px 0;">
-      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px;">
+      <div class="landing-logo-wrap" style="margin-bottom:20px;">
         <svg width="56" height="75" viewBox="0 0 120 160" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="54" y="0" width="12" height="18" rx="6" fill="#2259e0"/>
           <rect x="57" y="3" width="6" height="12" rx="3" fill="#0d0e1c"/>
@@ -693,9 +693,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
           <text x="60" y="122" font-family="Arial" font-weight="900" font-size="13" fill="white" text-anchor="middle" letter-spacing="3">STAGE</text>
           <text x="60" y="140" font-family="Arial" font-weight="900" font-size="13" fill="white" text-anchor="middle" letter-spacing="3">ACCESS</text>
         </svg>
-        <div style="font-size:20px;font-weight:800;letter-spacing:2px;color:var(--text);margin-top:14px;">STAGE ACCESS</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:4px;">Event Credentialing Platform</div>
       </div>
+      <div style="font-size:20px;font-weight:800;letter-spacing:2px;color:var(--text);text-align:center;margin-bottom:4px;">STAGE ACCESS</div>
+      <div style="font-size:12px;color:var(--text-muted);letter-spacing:2px;text-align:center;margin-bottom:28px;">Event Credentialing Platform</div>
 
       <div class="card" style="padding:24px;">
         <div id="login-error" style="display:none;background:rgba(224,85,85,.1);border:1px solid var(--red);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:16px;"></div>
