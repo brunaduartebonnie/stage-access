@@ -721,8 +721,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
               onkeydown="if(event.key==='Enter') doSetup()">
           </div>
           <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px;" onclick="doSetup()" id="setup-btn">
-            Criar conta de administrador
+            Criar conta
           </button>
+          <div style="text-align:center;margin-top:12px;">
+            <button class="btn btn-ghost btn-sm" onclick="showLoginForm()">← Já tenho conta</button>
+          </div>
         </div>
 
         <!-- Login form -->
@@ -739,8 +742,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
           <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px;" onclick="doLogin()" id="login-btn">
             Entrar
           </button>
-          <div style="text-align:center;margin-top:16px;">
+          <div style="text-align:center;margin-top:16px;display:flex;flex-direction:column;gap:8px;">
             <button class="btn btn-ghost btn-sm" onclick="showForgotPassword()">Esqueci a password</button>
+            <button class="btn btn-ghost btn-sm" onclick="showSetupForm()" style="color:var(--blue)">Criar conta →</button>
           </div>
         </div>
 
@@ -4106,15 +4110,19 @@ document.addEventListener('click', e => {
 });
 
 // ── FIRST-TIME SETUP ──────────────────────────────────
+function showSetupForm() {
+  document.getElementById('setup-form-wrap').style.display = '';
+  document.getElementById('login-form-wrap').style.display = 'none';
+  document.getElementById('forgot-form-wrap').style.display = 'none';
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-success').style.display = 'none';
+}
+
 async function checkFirstTimeSetup() {
-  // Check if any users exist in user_profiles
-  const { count } = await db.from('user_profiles').select('*', { count: 'exact', head: true });
-  if (count === 0) {
-    // No users yet — show setup form instead of login
-    document.getElementById('setup-form-wrap').style.display = '';
-    document.getElementById('login-form-wrap').style.display = 'none';
-    document.getElementById('login-footer-msg').textContent = 'Configura a primeira conta de administrador.';
-  }
+  try {
+    const { count } = await db.from('user_profiles').select('*', { count: 'exact', head: true });
+    if (count === 0) showSetupForm();
+  } catch(e) { /* silently ignore — user can always click "Criar conta" */ }
 }
 
 async function doSetup() {
@@ -4182,7 +4190,7 @@ async function doLogout() {
   showView('login', false);
 }
 
-function showLoginForm()     { document.getElementById('login-form-wrap').style.display = ''; document.getElementById('forgot-form-wrap').style.display = 'none'; document.getElementById('login-error').style.display = 'none'; }
+function showLoginForm()     { document.getElementById('login-form-wrap').style.display = ''; document.getElementById('forgot-form-wrap').style.display = 'none'; document.getElementById('setup-form-wrap').style.display = 'none'; document.getElementById('login-error').style.display = 'none'; document.getElementById('login-success').style.display = 'none'; }
 function showForgotPassword(){ document.getElementById('login-form-wrap').style.display = 'none'; document.getElementById('forgot-form-wrap').style.display = ''; document.getElementById('login-error').style.display = 'none'; }
 
 async function doForgotPassword() {
