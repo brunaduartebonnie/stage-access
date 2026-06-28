@@ -919,6 +919,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         </div>
       </div>
 
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header" style="cursor:pointer;user-select:none;" onclick="toggleGatesSection()">
+          <span class="card-title">Portões / Zonas de Acesso</span>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">(opcional)</span>
+          <svg id="gates-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-left:auto;transition:transform .2s"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div id="gates-section" style="display:none;margin-top:8px;">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">Define os portões ou zonas do teu evento. O scanner vai pedir ao segurança para seleccionar o portão antes de começar a ler credenciais.</p>
+          <div id="gates-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
+          <div style="display:flex;gap:10px;">
+            <input id="new-gate-input" class="form-input" type="text" placeholder="Ex: Portão A, VIP, Backstage, Palco...">
+            <button class="btn btn-secondary" onclick="addGate()">Adicionar</button>
+          </div>
+        </div>
+      </div>
+
       <div style="display:flex;gap:12px;margin-top:8px;">
         <button class="btn btn-primary btn-lg" style="flex:1" onclick="saveEvent()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -1264,6 +1280,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       Live
     </span>
   </div>
+  <!-- Gate selector — shown only when event has gates -->
+  <div id="gate-selector-bar" style="display:none;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);">
+    <div style="font-size:11px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;">Portão activo</div>
+    <div id="gate-selector-chips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+  </div>
+
   <div class="scanner-wrapper">
     <div id="qr-reader"></div>
     <p class="scanner-hint">Aponta a câmara para a credencial do membro</p>
@@ -1548,13 +1570,14 @@ const fromDBEvent = r => ({
   accentColor: r.accent_color, eventLogoData: r.event_logo_data,
   artistLogoData: r.artist_logo_data, customAccessTypes: r.custom_access_types || [],
   sessionToken: r.session_token, createdAt: r.created_at,
+  gates: r.gates || [],
 });
 const toDBEvent = ev => ({
   id: ev.id, name: ev.name, date: ev.date || null, venue: ev.venue || null,
   artist: ev.artist || null, accent_color: ev.accentColor || '#2259e0',
   event_logo_data: ev.eventLogoData || null, artist_logo_data: ev.artistLogoData || null,
   custom_access_types: ev.customAccessTypes || [], session_token: ev.sessionToken,
-  created_at: ev.createdAt || Date.now(),
+  created_at: ev.createdAt || Date.now(), gates: ev.gates || [],
 });
 const fromDBStaff = r => ({
   id: r.id, eventId: r.event_id, name: r.name, role: r.role, email: r.email,
@@ -1571,7 +1594,7 @@ const toDBStaff = m => ({
   days: m.days || [], schedule: m.schedule || null, issued_at: m.issuedAt || null,
   photo: m.photo || null, company: m.company || null,
 });
-const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: r.event_id, ts: r.ts });
+const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: r.event_id, ts: r.ts, gate: r.gate || null });
 
 // ════════════════════════════════════════════════════════
 //  STATE (in-memory cache)
@@ -1650,7 +1673,7 @@ async function deleteStaffById(id) {
 
 async function insertCheckin(ck) {
   const { error } = await db.from('checkins').insert({
-    id: ck.id, credential_id: ck.credentialId, event_id: ck.eventId, ts: ck.ts,
+    id: ck.id, credential_id: ck.credentialId, event_id: ck.eventId, ts: ck.ts, gate: ck.gate || null,
   });
   if (error) throw error;
   state.checkins.unshift(ck);
@@ -1759,6 +1782,8 @@ function openEvent(id) {
 let tempEventLogoData = null;
 let tempArtistLogoData = null;
 let customAccessTypes = [];
+let tempGates = [];
+let activeGate = null; // currently selected gate in scanner
 
 function initCreateEventForm() {
   const ev = editingEventId ? state.events.find(e => e.id === editingEventId) : null;
@@ -1788,6 +1813,20 @@ function initCreateEventForm() {
   // Custom access types
   customAccessTypes = ev ? (ev.customAccessTypes || []) : [];
   renderAccessTypesList();
+
+  // Gates
+  tempGates = ev ? (ev.gates || []) : [];
+  const hasGates = tempGates.length > 0;
+  const gatesSection = document.getElementById('gates-section');
+  const gatesChevron = document.getElementById('gates-chevron');
+  if (hasGates) {
+    gatesSection.style.display = '';
+    gatesChevron.style.transform = 'rotate(90deg)';
+  } else {
+    gatesSection.style.display = 'none';
+    gatesChevron.style.transform = '';
+  }
+  renderGatesList();
 }
 
 function handleLogoUpload(input, type) {
@@ -1847,6 +1886,71 @@ function removeAccessType(i) {
   renderAccessTypesList();
 }
 
+// ── GATES ──────────────────────────────────────────────
+function toggleGatesSection() {
+  const sec = document.getElementById('gates-section');
+  const chev = document.getElementById('gates-chevron');
+  const open = sec.style.display !== 'none';
+  sec.style.display = open ? 'none' : '';
+  chev.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+function renderGatesList() {
+  const el = document.getElementById('gates-list');
+  if (!el) return;
+  if (!tempGates.length) { el.innerHTML = ''; return; }
+  el.innerHTML = tempGates.map((g, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:var(--blue)"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span style="flex:1;font-size:14px;font-weight:500">${esc(g)}</span>
+      <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--red)" onclick="removeGate(${i})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function addGate() {
+  const input = document.getElementById('new-gate-input');
+  const val = input.value.trim();
+  if (!val) return;
+  if (tempGates.includes(val)) { toast('Portão já existe', 'error'); return; }
+  tempGates.push(val);
+  input.value = '';
+  renderGatesList();
+}
+
+function removeGate(i) {
+  tempGates.splice(i, 1);
+  renderGatesList();
+}
+
+// ── GATE SELECTOR IN SCANNER ───────────────────────────
+function renderGateSelectorBar(gates) {
+  const bar = document.getElementById('gate-selector-bar');
+  const chips = document.getElementById('gate-selector-chips');
+  if (!gates || !gates.length) { bar.style.display = 'none'; activeGate = null; return; }
+  bar.style.display = '';
+  // Default to first gate
+  if (!activeGate || !gates.includes(activeGate)) activeGate = gates[0];
+  chips.innerHTML = gates.map(g => `
+    <button onclick="selectGate('${esc(g)}')" style="
+      padding:5px 14px;border-radius:20px;border:1.5px solid ${g===activeGate?'var(--blue)':'var(--border)'};
+      background:${g===activeGate?'var(--blue)':'var(--surface2)'};
+      color:${g===activeGate?'#fff':'var(--text)'};
+      font-size:12px;font-weight:${g===activeGate?'700':'400'};
+      cursor:pointer;transition:all .15s;">
+      ${esc(g)}
+    </button>
+  `).join('');
+}
+
+function selectGate(g) {
+  activeGate = g;
+  const ev = state.events.find(e => e.id === currentEventId);
+  if (ev) renderGateSelectorBar(ev.gates || []);
+}
+
 async function saveEvent() {
   const name = document.getElementById('ev-name').value.trim();
   if (!name) { toast('Nome do evento obrigatório', 'error'); return; }
@@ -1862,6 +1966,7 @@ async function saveEvent() {
     eventLogoData: tempEventLogoData,
     artistLogoData: tempArtistLogoData,
     customAccessTypes: [...customAccessTypes],
+    gates: [...tempGates],
     sessionToken: existing ? existing.sessionToken : uid(),
     createdAt: existing ? existing.createdAt : Date.now(),
   };
@@ -2726,6 +2831,8 @@ function launchScanner(ev) {
   document.getElementById('scan-count-ok').textContent = '0';
   document.getElementById('scan-count-err').textContent = '0';
   document.getElementById('scanner-event-name').textContent = ev.name;
+  activeGate = null;
+  renderGateSelectorBar(ev.gates || []);
   showView('scanner', false);
 
   setTimeout(() => {
@@ -2773,7 +2880,7 @@ function handleCredentialScan(text, ev) {
     }
 
     // Valid!
-    const ck = { id: uid(), credentialId: data.credId, eventId: ev.id, ts: Date.now() };
+    const ck = { id: uid(), credentialId: data.credId, eventId: ev.id, ts: Date.now(), gate: activeGate || null };
     // Save offline-first: add to local state immediately, sync in background
     if (!state.checkins.find(c => c.id === ck.id)) state.checkins.unshift(ck);
     saveOfflineCheckins(ev.id);
@@ -2781,7 +2888,8 @@ function handleCredentialScan(text, ev) {
     scanOkCount++;
     document.getElementById('scan-count-ok').textContent = scanOkCount;
     playBeep('ok');
-    showScanResult('valid', member.name, member.role, '✓ Entrada permitida', member.access, ev.name, member.company);
+    const gateMsg = activeGate ? `✓ Entrada permitida · ${activeGate}` : '✓ Entrada permitida';
+    showScanResult('valid', member.name, member.role, gateMsg, member.access, ev.name, member.company);
   } catch(e) {
     scanErrCount++;
     document.getElementById('scan-count-err').textContent = scanErrCount;
