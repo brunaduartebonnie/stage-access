@@ -875,6 +875,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Staff</div></div>
       <div class="stat-card"><div class="stat-value" id="stat-credentials">0</div><div class="stat-label">Credenciais</div></div>
       <div class="stat-card"><div class="stat-value" id="stat-checkins">0</div><div class="stat-label">Entradas</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-attendance">—</div><div class="stat-label">Presença</div></div>
+    </div>
+    <!-- Live attendance bar -->
+    <div id="attendance-bar-wrap" style="display:none;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px;">
+        <span>Taxa de entrada</span><span id="attendance-bar-label">0 / 0</span>
+      </div>
+      <div style="height:6px;background:var(--surface2);border-radius:99px;overflow:hidden;">
+        <div id="attendance-bar-fill" style="height:100%;background:var(--green);border-radius:99px;width:0%;transition:width .4s;"></div>
+      </div>
     </div>
 
     <div class="tabs">
@@ -910,6 +920,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 
     <!-- CHECKINS TAB -->
     <div id="tab-checkins" style="display:none">
+      <!-- Breakdown by access type -->
+      <div id="checkins-breakdown" style="margin-bottom:12px;display:none;"></div>
       <div class="section-header" style="margin-top:0">
         <span class="section-title">Registo de Entradas</span>
         <button class="btn btn-danger btn-sm" onclick="clearCheckins()">Limpar</button>
@@ -1750,6 +1762,19 @@ function renderEventDetail() {
   document.getElementById('stat-credentials').textContent = credCount;
   document.getElementById('stat-checkins').textContent = checkins.length;
 
+  // Attendance rate
+  const pct = credCount > 0 ? Math.round((checkins.length / credCount) * 100) : null;
+  document.getElementById('stat-attendance').textContent = pct !== null ? pct + '%' : '—';
+  const barWrap = document.getElementById('attendance-bar-wrap');
+  if (credCount > 0) {
+    barWrap.style.display = '';
+    document.getElementById('attendance-bar-label').textContent = `${checkins.length} / ${credCount}`;
+    document.getElementById('attendance-bar-fill').style.width = pct + '%';
+  } else { barWrap.style.display = 'none'; }
+
+  // Breakdown by access type
+  renderCheckinsBreakdown(checkins, members);
+
   renderStaffList(members);
   renderCheckinsList(checkins, members);
 
@@ -1826,6 +1851,42 @@ function renderStaffCard(m) {
 }
 
 function renderStaffBarcodes() {} // no-op, barcodes now only in detail view
+
+function renderCheckinsBreakdown(checkins, members) {
+  const el = document.getElementById('checkins-breakdown');
+  if (!el) return;
+  if (!checkins.length) { el.style.display = 'none'; return; }
+
+  // Group members by access type, count how many checked in
+  const byAccess = {};
+  members.forEach(m => {
+    if (!m.credentialId) return;
+    const a = m.access || 'Sem acesso';
+    if (!byAccess[a]) byAccess[a] = { total: 0, in: 0 };
+    byAccess[a].total++;
+    if (checkins.find(c => c.credentialId === m.credentialId)) byAccess[a].in++;
+  });
+
+  const sorted = Object.entries(byAccess).sort((a,b) => b[1].in - a[1].in);
+  el.style.display = '';
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:4px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text2);text-transform:uppercase;margin-bottom:10px;">Entradas por Acesso</div>
+      ${sorted.map(([access, d]) => {
+        const pct = d.total > 0 ? Math.round((d.in / d.total) * 100) : 0;
+        return `
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+              <span style="font-weight:600;color:var(--text)">${esc(access)}</span>
+              <span style="color:var(--text2)">${d.in} / ${d.total} <span style="color:var(--green);font-weight:700">${pct}%</span></span>
+            </div>
+            <div style="height:5px;background:var(--surface2);border-radius:99px;overflow:hidden;">
+              <div style="height:100%;background:var(--green);border-radius:99px;width:${pct}%;transition:width .4s;"></div>
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
 
 function renderCheckinsList(checkins, members) {
   const list = document.getElementById('checkins-list');
