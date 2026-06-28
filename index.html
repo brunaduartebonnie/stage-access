@@ -1096,6 +1096,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none;" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input id="staff-search" class="form-input" type="search" placeholder="Pesquisar membro..." style="padding-left:36px;height:38px;font-size:13px;" oninput="renderStaffList()">
       </div>
+      <div id="staff-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
       <div id="staff-list"></div>
     </div>
 
@@ -1217,6 +1218,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       <div class="form-group">
         <label class="form-label">Notas</label>
         <textarea id="staff-notes" class="form-textarea" placeholder="Informação adicional..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">⚠️ Alerta no scanner</label>
+        <input id="staff-scan-alert" class="form-input" placeholder="Ex: Verificar documento de identificação" type="text">
+        <small style="color:var(--text-muted);font-size:11px;">Aparece como aviso ao operador no momento do scan.</small>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+          <input type="checkbox" id="staff-blocked" style="width:18px;height:18px;accent-color:var(--red);cursor:pointer;">
+          <span class="form-label" style="margin:0;">🚫 Credencial bloqueada (acesso negado no scanner)</span>
+        </label>
       </div>
     </div>
     <div style="display:flex;gap:12px;margin-top:16px;">
@@ -1689,6 +1701,7 @@ const fromDBStaff = r => ({
   credentialQRData: r.credential_qr_data, createdAt: r.created_at,
   days: r.days || [], schedule: r.schedule || '', issuedAt: r.issued_at || null,
   photo: r.photo || null, company: r.company || null,
+  blocked: r.blocked || false, scanAlert: r.scan_alert || null,
 });
 const toDBStaff = m => ({
   id: m.id, event_id: m.eventId, name: m.name, role: m.role || null,
@@ -1697,6 +1710,7 @@ const toDBStaff = m => ({
   credential_qr_data: m.credentialQRData || null, created_at: m.createdAt || Date.now(),
   days: m.days || [], schedule: m.schedule || null, issued_at: m.issuedAt || null,
   photo: m.photo || null, company: m.company || null,
+  blocked: m.blocked || false, scan_alert: m.scanAlert || null,
 });
 const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: r.event_id, ts: r.ts, gate: r.gate || null, note: r.note || null });
 
@@ -2235,12 +2249,40 @@ function renderEventDetail() {
   populateAccessSelect(ev);
 }
 
+let staffActiveFilter = null; // null = todos, 'blocked' = bloqueados, or access type string
+
+function renderStaffFilters(members) {
+  const wrap = document.getElementById('staff-filters');
+  if (!wrap) return;
+  const accessTypes = [...new Set(members.map(m => m.access).filter(Boolean))].sort();
+  const hasBlocked = members.some(m => m.blocked);
+  const hasNoCredential = members.some(m => !m.credentialId);
+  const chips = [
+    { key: null, label: 'Todos', count: members.length },
+    ...accessTypes.map(a => ({ key: 'access:' + a, label: a, count: members.filter(m => m.access === a).length })),
+    ...(hasBlocked ? [{ key: 'blocked', label: '🚫 Bloqueados', count: members.filter(m => m.blocked).length }] : []),
+    ...(hasNoCredential ? [{ key: 'no-cred', label: 'Sem credencial', count: members.filter(m => !m.credentialId).length }] : []),
+  ];
+  wrap.innerHTML = chips.map(c => {
+    const active = staffActiveFilter === c.key;
+    return `<button onclick="setStaffFilter(${JSON.stringify(c.key)})" style="padding:4px 10px;border-radius:20px;border:1.5px solid ${active?'var(--blue)':'var(--border)'};background:${active?'var(--blue)':'var(--surface2)'};color:${active?'#fff':'var(--text-muted)'};font-size:11px;font-weight:600;cursor:pointer;">${c.label} <span style="opacity:.7">${c.count}</span></button>`;
+  }).join('');
+}
+
+function setStaffFilter(key) {
+  staffActiveFilter = key;
+  renderStaffList();
+}
+
 function renderStaffList(members) {
   const list = document.getElementById('staff-list');
   // Apply search filter
   const q = (document.getElementById('staff-search')?.value || '').toLowerCase().trim();
   if (!members) members = state.staff.filter(s => s.eventId === currentEventId);
-  const filtered = q
+
+  renderStaffFilters(members);
+
+  let filtered = q
     ? members.filter(m =>
         m.name.toLowerCase().includes(q) ||
         (m.role||'').toLowerCase().includes(q) ||
@@ -2248,6 +2290,14 @@ function renderStaffList(members) {
         (m.access||'').toLowerCase().includes(q) ||
         (m.credentialId||'').toLowerCase().includes(q))
     : members;
+
+  // Apply active filter chip
+  if (staffActiveFilter === 'blocked') filtered = filtered.filter(m => m.blocked);
+  else if (staffActiveFilter === 'no-cred') filtered = filtered.filter(m => !m.credentialId);
+  else if (staffActiveFilter && staffActiveFilter.startsWith('access:')) {
+    const a = staffActiveFilter.slice(7);
+    filtered = filtered.filter(m => m.access === a);
+  }
 
   if (!filtered.length) {
     list.innerHTML = q
@@ -2291,9 +2341,13 @@ function renderStaffCard(m) {
     ? `<div class="staff-row-avatar" style="background:transparent;padding:0;overflow:hidden;"><img src="${m.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>`
     : `<div class="staff-row-avatar" style="background:${accessBg(m.access)};color:${accessFg(m.access)}">${initials}</div>`;
   const hasCredential = !!m.credentialId;
-  return `<div class="staff-row" onclick="openMember('${m.id}')">
+  return `<div class="staff-row" onclick="openMember('${m.id}')" style="${m.blocked ? 'opacity:.6;' : ''}">
     ${avatarHTML}
-    <div class="staff-row-name">${esc(m.name)}${m.company ? `<span style="display:block;font-size:11px;color:var(--text-muted);font-weight:400;margin-top:1px;">${esc(m.company)}</span>` : ''}</div>
+    <div class="staff-row-name">
+      ${m.blocked ? '<span style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:.5px;">🚫 BLOQUEADO · </span>' : ''}
+      ${esc(m.name)}${m.company ? `<span style="display:block;font-size:11px;color:var(--text-muted);font-weight:400;margin-top:1px;">${esc(m.company)}</span>` : ''}
+      ${m.scanAlert ? `<span style="display:block;font-size:10px;color:#ff9800;font-weight:600;margin-top:1px;">⚠️ ${esc(m.scanAlert)}</span>` : ''}
+    </div>
     <div class="staff-row-right">
       <span class="badge ${accessBadgeClass(m.access)}">${esc(m.access||'—')}</span>
       ${hasCredential
@@ -2568,6 +2622,8 @@ function initAddStaffForm() {
   const ev = state.events.find(e => e.id === currentEventId);
   populateAccessSelect(ev);
   if (m) document.getElementById('staff-access').value = m.access;
+  document.getElementById('staff-scan-alert').value = m ? m.scanAlert || '' : '';
+  document.getElementById('staff-blocked').checked = m ? m.blocked || false : false;
 }
 
 function toggleDayChip(input) {
@@ -2652,6 +2708,8 @@ async function saveMember() {
     notes: document.getElementById('staff-notes').value.trim(),
     access, days, schedule,
     photo: document.getElementById('staff-photo-img').src || existing?.photo || null,
+    scanAlert: document.getElementById('staff-scan-alert').value.trim() || null,
+    blocked: document.getElementById('staff-blocked').checked,
     credentialId: existing ? existing.credentialId : null,
     credentialQRData: existing ? existing.credentialQRData : null,
     createdAt: existing ? existing.createdAt : Date.now(),
@@ -3198,6 +3256,15 @@ function handleCredentialScan(text, ev) {
       return;
     }
 
+    // Check if credential is blocked
+    if (member.blocked) {
+      playBeep('err');
+      showScanResult('invalid', member.name, member.role, '🚫 Credencial bloqueada — acesso negado', member.access, ev.name, member.company);
+      scanErrCount++;
+      document.getElementById('scan-count-err').textContent = scanErrCount;
+      return;
+    }
+
     // Check schedule validity (HH:MM – HH:MM)
     if (member.schedule) {
       const m = member.schedule.match(/(\d{1,2}):(\d{2})\s*[–\-]\s*(\d{1,2}):(\d{2})/);
@@ -3239,7 +3306,7 @@ function handleCredentialScan(text, ev) {
     document.getElementById('scan-count-ok').textContent = scanOkCount;
     playBeep('ok');
     const gateMsg = activeGate ? `✓ Entrada permitida · ${activeGate}` : '✓ Entrada permitida';
-    showScanResult('valid', member.name, member.role, gateMsg, member.access, ev.name, member.company);
+    showScanResult('valid', member.name, member.role, gateMsg, member.access, ev.name, member.company, member.scanAlert);
   } catch(e) {
     scanErrCount++;
     document.getElementById('scan-count-err').textContent = scanErrCount;
@@ -3248,7 +3315,7 @@ function handleCredentialScan(text, ev) {
   }
 }
 
-function showScanResult(type, name, role, msg, access, eventName, company) {
+function showScanResult(type, name, role, msg, access, eventName, company, scanAlert) {
   const overlay = document.getElementById('scan-result-overlay');
   const card = document.getElementById('scan-result-card');
   const icon = document.getElementById('scan-result-icon');
@@ -3274,6 +3341,22 @@ function showScanResult(type, name, role, msg, access, eventName, company) {
   const accessEl = document.getElementById('scan-result-access');
   accessEl.textContent = access || '';
   accessEl.style.display = access ? '' : 'none';
+
+  // Show scan alert if present (warning banner for operator)
+  let alertEl = document.getElementById('scan-alert-banner');
+  if (!alertEl) {
+    alertEl = document.createElement('div');
+    alertEl.id = 'scan-alert-banner';
+    alertEl.style.cssText = 'background:#ff9800;color:#000;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:700;text-align:center;margin-top:8px;display:none;';
+    document.getElementById('scan-result-card').insertBefore(alertEl, document.getElementById('scan-note-wrap'));
+  }
+  if (scanAlert && type === 'valid') {
+    alertEl.textContent = '⚠️ ' + scanAlert;
+    alertEl.style.display = '';
+    playBeep('warn');
+  } else {
+    alertEl.style.display = 'none';
+  }
 
   // Show note field only on valid scan
   const noteWrap = document.getElementById('scan-note-wrap');
