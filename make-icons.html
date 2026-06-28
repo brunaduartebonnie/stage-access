@@ -14,7 +14,7 @@ function drawIcon(canvas) {
 
   // Scale badge (120x160) to fit square with padding
   const BADGE_W = 120, BADGE_H = 160;
-  const padding = s * 0.12;
+  const padding = s * 0.20;
   const scale = Math.min((s - padding*2) / BADGE_W, (s - padding*2) / BADGE_H);
   const offX = (s - BADGE_W * scale) / 2;
   const offY = (s - BADGE_H * scale) / 2;
@@ -35,7 +35,7 @@ function drawIcon(canvas) {
 
   // Lanyard clip
   ctx.fillStyle = '#2259e0'; rr(54,0,12,18,6); ctx.fill();
-  ctx.fillStyle = '#0d0e1c'; rr(57,3,6,12,3); ctx.fill();
+  ctx.fillStyle = '#ffffff'; rr(57,3,6,12,3); ctx.fill();
   ctx.fillStyle = '#2259e0'; ctx.fillRect(58,16,4,10);
 
   // Badge body

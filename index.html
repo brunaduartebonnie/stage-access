@@ -1572,10 +1572,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       <div class="form-group">
         <label class="form-label">Função</label>
         <select id="invite-role" class="form-select">
-          <option value="admin">Admin — acesso total</option>
-          <option value="producao" selected>Produção — gerir eventos e credenciais</option>
-          <option value="marketing">Marketing — ver e exportar</option>
-          <option value="ticketing">Ticketing — só scanner</option>
+          <option value="admin">Admin — gere eventos e credenciais</option>
+          <option value="producao" selected>Produção — gere credenciais</option>
+          <option value="marketing">Marketing — credenciais de convites, artistas e media</option>
+          <option value="ticketing">Ticketing — ver, exportar e gerir credenciais de staff</option>
         </select>
       </div>
       <button class="btn btn-primary" onclick="inviteUser()" style="width:100%;">
@@ -4207,30 +4207,31 @@ async function loadUserProfile(userId, email) {
 }
 
 function applyRolePermissions(role) {
-  // Hide/show features based on role
+  // Role capabilities:
+  // admin     — cria/gere eventos e credenciais (só vê os seus eventos)
+  // producao  — gere credenciais (não cria eventos)
+  // marketing — gere credenciais de convites, artistas e media
+  // ticketing — ver, exportar/importar e gerir credenciais de staff
+
   const isAdmin    = role === 'admin';
-  const canManage  = role === 'admin' || role === 'producao';
-  const canView    = role === 'marketing';
-  const scanOnly   = role === 'ticketing';
 
-  // Dashboard: hide "Novo Evento" for marketing/ticketing
+  // "Novo Evento" — apenas admin
   const btnNew = document.getElementById('btn-new-event');
-  if (btnNew) btnNew.style.display = canManage ? '' : 'none';
+  if (btnNew) btnNew.style.display = isAdmin ? '' : 'none';
 
-  // User management: admin only
+  // Gerir utilizadores — apenas admin
   const btnUsers = document.getElementById('btn-manage-users');
   if (btnUsers) btnUsers.style.display = isAdmin ? '' : 'none';
+}
 
-  // If ticketing: go straight to scanner
-  if (scanOnly) {
-    showView('landing', false);
-    // Hide master event button, keep only scanner
-    document.querySelectorAll('.btn-landing-master').forEach(b => b.style.display = 'none');
-    return;
-  }
-  if (canView) {
-    // Marketing: hide add/edit/delete staff buttons (done dynamically in render)
-  }
+function canEditCredentials(role) {
+  // All roles can manage credentials (each with their own scope):
+  // admin, producao, marketing, ticketing — all can edit/add/delete members
+  return true;
+}
+
+function canCreateEvents(role) {
+  return role === 'admin';
 }
 
 function updateUserMenuUI() {
