@@ -699,6 +699,31 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 
       <div class="card" style="padding:24px;">
         <div id="login-error" style="display:none;background:rgba(224,85,85,.1);border:1px solid var(--red);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:16px;"></div>
+        <div id="login-success" style="display:none;background:rgba(48,188,133,.1);border:1px solid var(--green);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--green);margin-bottom:16px;"></div>
+
+        <!-- First-time setup -->
+        <div id="setup-form-wrap" style="display:none;">
+          <div style="text-align:center;margin-bottom:18px;">
+            <div style="font-size:15px;font-weight:700;color:var(--text)">Primeira configuração</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Cria a conta de administrador</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">O teu nome</label>
+            <input id="setup-name" class="form-input" type="text" placeholder="Ex: Bruna Duarte">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input id="setup-email" class="form-input" type="email" placeholder="o-teu@email.com" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input id="setup-password" class="form-input" type="password" placeholder="mínimo 6 caracteres"
+              onkeydown="if(event.key==='Enter') doSetup()">
+          </div>
+          <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px;" onclick="doSetup()" id="setup-btn">
+            Criar conta de administrador
+          </button>
+        </div>
 
         <!-- Login form -->
         <div id="login-form-wrap">
@@ -733,7 +758,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         </div>
       </div>
 
-      <p style="font-size:11px;color:var(--text2);text-align:center;margin-top:16px;opacity:.6;">
+      <p id="login-footer-msg" style="font-size:11px;color:var(--text2);text-align:center;margin-top:16px;opacity:.6;">
         Acesso apenas por convite. Contacta o administrador.
       </p>
     </div>
@@ -4080,6 +4105,52 @@ document.addEventListener('click', e => {
   if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) menu.style.display = 'none';
 });
 
+// ── FIRST-TIME SETUP ──────────────────────────────────
+async function checkFirstTimeSetup() {
+  // Check if any users exist in user_profiles
+  const { count } = await db.from('user_profiles').select('*', { count: 'exact', head: true });
+  if (count === 0) {
+    // No users yet — show setup form instead of login
+    document.getElementById('setup-form-wrap').style.display = '';
+    document.getElementById('login-form-wrap').style.display = 'none';
+    document.getElementById('login-footer-msg').textContent = 'Configura a primeira conta de administrador.';
+  }
+}
+
+async function doSetup() {
+  const name  = document.getElementById('setup-name').value.trim();
+  const email = document.getElementById('setup-email').value.trim();
+  const pass  = document.getElementById('setup-password').value;
+  const btn   = document.getElementById('setup-btn');
+  const err   = document.getElementById('login-error');
+  const suc   = document.getElementById('login-success');
+  err.style.display = 'none'; suc.style.display = 'none';
+  if (!name)  { err.textContent = 'Introduz o teu nome.'; err.style.display = ''; return; }
+  if (!email) { err.textContent = 'Introduz o teu email.'; err.style.display = ''; return; }
+  if (pass.length < 6) { err.textContent = 'A password precisa de ter pelo menos 6 caracteres.'; err.style.display = ''; return; }
+
+  btn.textContent = 'A criar conta…'; btn.disabled = true;
+  const { data, error } = await db.auth.signUp({ email, password: pass, options: { data: { name } } });
+  btn.textContent = 'Criar conta de administrador'; btn.disabled = false;
+
+  if (error) { err.textContent = error.message; err.style.display = ''; return; }
+
+  // If email confirmation is required, show message; otherwise log in directly
+  if (data.user && !data.session) {
+    suc.textContent = '✓ Conta criada! Verifica o teu email para confirmar e depois faz login.';
+    suc.style.display = '';
+    document.getElementById('setup-form-wrap').style.display = 'none';
+    document.getElementById('login-form-wrap').style.display = '';
+    document.getElementById('login-email').value = email;
+    document.getElementById('login-footer-msg').textContent = 'Acesso apenas por convite. Contacta o administrador.';
+  } else if (data.user && data.session) {
+    // Auto-confirmed (email confirmation disabled) — create profile as admin and log in
+    const profile = { id: data.user.id, email, name, role: 'admin' };
+    await db.from('user_profiles').upsert(profile);
+    await afterLogin(data.user);
+  }
+}
+
 // Login
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -4181,6 +4252,7 @@ async function inviteUser() {
     await afterLogin(session.user);
   } else {
     showView('login', false);
+    checkFirstTimeSetup();
   }
 
   // Listen for auth changes
