@@ -1087,6 +1087,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
           <span class="card-title">Detalhes do Membro</span>
           <div style="display:flex;gap:8px;">
             <button class="btn btn-secondary btn-sm" id="edit-member-btn" onclick="editCurrentMember()">Editar</button>
+            <button class="btn btn-secondary btn-sm" onclick="duplicateCurrentMember()" title="Duplicar com nova credencial">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Duplicar
+            </button>
             <button class="btn btn-danger btn-sm" id="delete-member-btn" onclick="deleteCurrentMember()">Eliminar</button>
           </div>
         </div>
@@ -2047,6 +2051,42 @@ function openMember(id) {
 function editCurrentMember() {
   editingMemberId = currentMemberId;
   showView('add-staff');
+}
+
+async function duplicateCurrentMember() {
+  const src = state.staff.find(s => s.id === currentMemberId);
+  if (!src) return;
+  const now = Date.now();
+  const newId = uid();
+  const credId = 'CRED-' + uid(8).toUpperCase();
+  const copy = {
+    ...src,
+    id: newId,
+    credentialId: credId,
+    issuedAt: now,
+    createdAt: now,
+    credentialQRData: JSON.stringify({
+      type: 'stage-access-credential',
+      credId,
+      eventId: src.eventId,
+      name: src.name,
+      role: src.role,
+      access: src.access,
+      days: src.days,
+      schedule: src.schedule,
+      issued: now,
+    }),
+  };
+  showLoading('A duplicar…');
+  try {
+    await upsertStaff(copy);
+    state.staff.push(copy);
+    currentMemberId = newId;
+    editingMemberId = newId; // open in edit so user can change name
+    toast('Membro duplicado — altera o nome e guarda', 'success');
+    showView('add-staff');
+  } catch(e) { toast('Erro ao duplicar', 'error'); }
+  hideLoading();
 }
 
 async function deleteCurrentMember() {
