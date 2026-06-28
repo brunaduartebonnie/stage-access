@@ -1710,11 +1710,18 @@ async function loadDB() {
       db.from('staff').select('*').order('created_at', { ascending: true }),
       db.from('checkins').select('*').order('ts', { ascending: false }),
     ]);
-    state.events = (evRes.data || []).map(fromDBEvent);
-    state.staff = (stRes.data || []).map(fromDBStaff);
+    if (evRes.error) console.error('events error:', evRes.error);
+    if (stRes.error) console.error('staff error:', stRes.error);
+    if (ckRes.error) console.error('checkins error:', ckRes.error);
+    if (evRes.error || stRes.error || ckRes.error) {
+      toast('Erro a carregar dados: ' + (evRes.error || stRes.error || ckRes.error).message, 'error');
+    }
+    state.events   = (evRes.data || []).map(fromDBEvent);
+    state.staff    = (stRes.data || []).map(fromDBStaff);
     state.checkins = (ckRes.data || []).map(fromDBCheckin);
   } catch(e) {
-    toast('Erro a ligar ao Supabase', 'error');
+    console.error('loadDB exception:', e);
+    toast('Erro a ligar ao Supabase: ' + e.message, 'error');
   }
   hideLoading();
 }
