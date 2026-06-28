@@ -1,74 +1,64 @@
 <!DOCTYPE html>
 <html>
-<body>
+<body style="background:#111;display:flex;gap:20px;padding:20px;align-items:flex-start;">
 <canvas id="c192" width="192" height="192"></canvas>
 <canvas id="c512" width="512" height="512"></canvas>
 <script>
 function drawIcon(canvas) {
   const s = canvas.width;
   const ctx = canvas.getContext('2d');
-  const scale = s / 120;
 
   // Background
-  ctx.fillStyle = '#0d0e1c';
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, s, s);
 
+  // Scale badge (120x160) to fit square with padding
+  const BADGE_W = 120, BADGE_H = 160;
+  const padding = s * 0.12;
+  const scale = Math.min((s - padding*2) / BADGE_W, (s - padding*2) / BADGE_H);
+  const offX = (s - BADGE_W * scale) / 2;
+  const offY = (s - BADGE_H * scale) / 2;
+
   ctx.save();
+  ctx.translate(offX, offY);
   ctx.scale(scale, scale);
 
-  // Clip (lanyard connector top)
-  ctx.fillStyle = '#2259e0';
-  roundRect(ctx, 54, 0, 12, 18, 6);
-  ctx.fill();
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.closePath();
+  }
 
-  ctx.fillStyle = '#0d0e1c';
-  roundRect(ctx, 57, 3, 6, 12, 3);
-  ctx.fill();
-
-  ctx.fillStyle = '#2259e0';
-  ctx.fillRect(58, 16, 4, 10);
+  // Lanyard clip
+  ctx.fillStyle = '#2259e0'; rr(54,0,12,18,6); ctx.fill();
+  ctx.fillStyle = '#0d0e1c'; rr(57,3,6,12,3); ctx.fill();
+  ctx.fillStyle = '#2259e0'; ctx.fillRect(58,16,4,10);
 
   // Badge body
-  ctx.fillStyle = '#2259e0';
-  roundRect(ctx, 10, 25, 100, 128, 18);
-  ctx.fill();
+  ctx.fillStyle = '#2259e0'; rr(10,25,100,128,18); ctx.fill();
 
   // Top shine
-  ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  roundRect(ctx, 10, 25, 100, 64, 18);
-  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.07)'; rr(10,25,100,64,18); ctx.fill();
 
   // Lightning bolt
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.moveTo(67, 44); ctx.lineTo(53, 75); ctx.lineTo(62, 75);
-  ctx.lineTo(55, 100); ctx.lineTo(73, 65); ctx.lineTo(63, 65);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(67,44); ctx.lineTo(53,75); ctx.lineTo(62,75);
+  ctx.lineTo(55,100); ctx.lineTo(73,65); ctx.lineTo(63,65);
+  ctx.closePath(); ctx.fill();
 
   // Text
   ctx.fillStyle = '#ffffff';
-  ctx.font = '900 13px Arial';
   ctx.textAlign = 'center';
-  ctx.letterSpacing = '3px';
+  ctx.font = `900 13px Arial`;
   ctx.fillText('STAGE', 60, 122);
   ctx.fillText('ACCESS', 60, 140);
 
   ctx.restore();
-}
-
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
 }
 
 const c192 = document.getElementById('c192');
@@ -76,15 +66,14 @@ const c512 = document.getElementById('c512');
 drawIcon(c192);
 drawIcon(c512);
 
-// Download both
 function dl(canvas, name) {
   const a = document.createElement('a');
   a.href = canvas.toDataURL('image/png');
   a.download = name;
   a.click();
 }
-setTimeout(() => { dl(c192, 'icon-192.png'); }, 300);
-setTimeout(() => { dl(c512, 'icon-512.png'); }, 800);
+setTimeout(() => dl(c192, 'icon-192.png'), 500);
+setTimeout(() => dl(c512, 'icon-512.png'), 1000);
 </script>
 </body>
 </html>
