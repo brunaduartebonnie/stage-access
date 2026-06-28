@@ -932,6 +932,23 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
   </div>
   <div class="page-content">
     <div class="card">
+      <!-- Photo picker -->
+      <div class="form-group" style="display:flex;align-items:center;gap:16px;">
+        <div id="staff-photo-preview" onclick="document.getElementById('staff-photo-input').click()"
+          style="width:72px;height:72px;border-radius:50%;background:var(--surface2);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;transition:border-color .15s;">
+          <svg id="staff-photo-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <img id="staff-photo-img" src="" style="display:none;width:100%;height:100%;object-fit:cover;">
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;">Foto do Membro</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Aparece na credencial gerada</div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('staff-photo-input').click()">Escolher foto</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="staff-photo-clear" style="display:none" onclick="clearStaffPhoto()">Remover</button>
+          </div>
+        </div>
+        <input id="staff-photo-input" type="file" accept="image/*" style="display:none" onchange="handleStaffPhoto(this)">
+      </div>
       <div class="form-group">
         <label class="form-label">Nome Completo *</label>
         <input id="staff-name" class="form-input" type="text" placeholder="Nome da pessoa credenciada">
@@ -1020,9 +1037,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
           <div class="badge-artist-name" id="badge-artist-name">—</div>
           <div class="badge-event-name" id="badge-event-name">—</div>
         </div>
-        <div class="badge-person-section">
-          <div class="badge-person-name" id="badge-person-name">—</div>
-          <div class="badge-person-role" id="badge-person-role">—</div>
+        <div class="badge-person-section" style="display:flex;align-items:center;gap:12px;">
+          <div id="badge-member-photo-wrap" style="display:none;width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2px solid rgba(255,255,255,.2);">
+            <img id="badge-member-photo" style="width:100%;height:100%;object-fit:cover;" src="">
+          </div>
+          <div>
+            <div class="badge-person-name" id="badge-person-name">—</div>
+            <div class="badge-person-role" id="badge-person-role">—</div>
+          </div>
         </div>
         <div class="badge-access-section">
           <div class="badge-access-chip" id="badge-access-chip">—</div>
@@ -1348,6 +1370,7 @@ const fromDBStaff = r => ({
   phone: r.phone, notes: r.notes, access: r.access, credentialId: r.credential_id,
   credentialQRData: r.credential_qr_data, createdAt: r.created_at,
   days: r.days || [], schedule: r.schedule || '', issuedAt: r.issued_at || null,
+  photo: r.photo || null,
 });
 const toDBStaff = m => ({
   id: m.id, event_id: m.eventId, name: m.name, role: m.role || null,
@@ -1355,6 +1378,7 @@ const toDBStaff = m => ({
   access: m.access, credential_id: m.credentialId || null,
   credential_qr_data: m.credentialQRData || null, created_at: m.createdAt || Date.now(),
   days: m.days || [], schedule: m.schedule || null, issued_at: m.issuedAt || null,
+  photo: m.photo || null,
 });
 const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: r.event_id, ts: r.ts });
 
@@ -1753,9 +1777,12 @@ function renderStaffList(members) {
 
 function renderStaffCard(m) {
   const initials = m.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();
+  const avatarHTML = m.photo
+    ? `<div class="staff-row-avatar" style="background:transparent;padding:0;overflow:hidden;"><img src="${m.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>`
+    : `<div class="staff-row-avatar" style="background:${accessBg(m.access)};color:${accessFg(m.access)}">${initials}</div>`;
   const hasCredential = !!m.credentialId;
   return `<div class="staff-row" onclick="openMember('${m.id}')">
-    <div class="staff-row-avatar" style="background:${accessBg(m.access)};color:${accessFg(m.access)}">${initials}</div>
+    ${avatarHTML}
     <div class="staff-row-name">${esc(m.name)}</div>
     <div class="staff-row-right">
       <span class="badge ${accessBadgeClass(m.access)}">${esc(m.access||'—')}</span>
@@ -1889,6 +1916,8 @@ function initAddStaffForm() {
   document.getElementById('staff-email').value = m ? m.email : '';
   document.getElementById('staff-phone').value = m ? m.phone : '';
   document.getElementById('staff-notes').value = m ? m.notes || '' : '';
+  // Photo
+  setStaffPhotoPreview(m ? m.photo || null : null);
   // Parse schedule "HH:MM – HH:MM" back into time fields
   const sched = m ? (m.schedule || '') : '';
   const schedMatch = sched.match(/(\d{1,2}:\d{2})\s*[–\-]\s*(\d{1,2}:\d{2})/);
@@ -1924,6 +1953,24 @@ function toggleDayChip(input) {
   }
 }
 
+function setStaffPhotoPreview(src) {
+  const img = document.getElementById('staff-photo-img');
+  const icon = document.getElementById('staff-photo-icon');
+  const clear = document.getElementById('staff-photo-clear');
+  if (src) {
+    img.src = src; img.style.display = 'block'; icon.style.display = 'none'; clear.style.display = '';
+  } else {
+    img.src = ''; img.style.display = 'none'; icon.style.display = ''; clear.style.display = 'none';
+  }
+}
+function handleStaffPhoto(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => setStaffPhotoPreview(e.target.result);
+  reader.readAsDataURL(file);
+}
+function clearStaffPhoto() { setStaffPhotoPreview(null); }
+
 function formatTimeInput(el) {
   let v = el.value.replace(/[^\d]/g, '').slice(0, 4);
   if (v.length >= 3) v = v.slice(0,2) + ':' + v.slice(2);
@@ -1957,6 +2004,7 @@ async function saveMember() {
     phone: document.getElementById('staff-phone').value.trim(),
     notes: document.getElementById('staff-notes').value.trim(),
     access, days, schedule,
+    photo: document.getElementById('staff-photo-img').src || existing?.photo || null,
     credentialId: existing ? existing.credentialId : null,
     credentialQRData: existing ? existing.credentialQRData : null,
     createdAt: existing ? existing.createdAt : Date.now(),
@@ -2075,6 +2123,10 @@ async function renderCredential() {
   document.getElementById('badge-event-name').textContent = ev.name + (ev.date ? ' · ' + new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'short',year:'numeric'}) : '');
   document.getElementById('badge-person-name').textContent = member.name;
   document.getElementById('badge-person-role').textContent = member.role || '';
+  const photoWrap = document.getElementById('badge-member-photo-wrap');
+  const photoImg  = document.getElementById('badge-member-photo');
+  if (member.photo) { photoImg.src = member.photo; photoWrap.style.display = 'block'; }
+  else { photoWrap.style.display = 'none'; photoImg.src = ''; }
   document.getElementById('badge-access-chip').textContent = member.access;
   document.getElementById('badge-access-chip').style.background = accent;
   document.getElementById('badge-access-chip').style.color = isLightColor(accent) ? '#000' : '#fff';
