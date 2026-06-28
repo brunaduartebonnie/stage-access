@@ -1072,6 +1072,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         <label class="form-label">Função / Cargo</label>
         <input id="staff-role" class="form-input" type="text" placeholder="Ex: Production Manager, Security, Press...">
       </div>
+      <div class="form-group">
+        <label class="form-label">Empresa / Equipa</label>
+        <input id="staff-company" class="form-input" type="text" placeholder="Ex: Riggers Pro, Audiovisuais XYZ, Catering...">
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Email</label>
@@ -1557,7 +1561,7 @@ const fromDBStaff = r => ({
   phone: r.phone, notes: r.notes, access: r.access, credentialId: r.credential_id,
   credentialQRData: r.credential_qr_data, createdAt: r.created_at,
   days: r.days || [], schedule: r.schedule || '', issuedAt: r.issued_at || null,
-  photo: r.photo || null,
+  photo: r.photo || null, company: r.company || null,
 });
 const toDBStaff = m => ({
   id: m.id, event_id: m.eventId, name: m.name, role: m.role || null,
@@ -1565,7 +1569,7 @@ const toDBStaff = m => ({
   access: m.access, credential_id: m.credentialId || null,
   credential_qr_data: m.credentialQRData || null, created_at: m.createdAt || Date.now(),
   days: m.days || [], schedule: m.schedule || null, issued_at: m.issuedAt || null,
-  photo: m.photo || null,
+  photo: m.photo || null, company: m.company || null,
 });
 const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: r.event_id, ts: r.ts });
 
@@ -1937,6 +1941,7 @@ function renderStaffList(members) {
     ? members.filter(m =>
         m.name.toLowerCase().includes(q) ||
         (m.role||'').toLowerCase().includes(q) ||
+        (m.company||'').toLowerCase().includes(q) ||
         (m.access||'').toLowerCase().includes(q) ||
         (m.credentialId||'').toLowerCase().includes(q))
     : members;
@@ -1985,7 +1990,7 @@ function renderStaffCard(m) {
   const hasCredential = !!m.credentialId;
   return `<div class="staff-row" onclick="openMember('${m.id}')">
     ${avatarHTML}
-    <div class="staff-row-name">${esc(m.name)}</div>
+    <div class="staff-row-name">${esc(m.name)}${m.company ? `<span style="display:block;font-size:11px;color:var(--text-muted);font-weight:400;margin-top:1px;">${esc(m.company)}</span>` : ''}</div>
     <div class="staff-row-right">
       <span class="badge ${accessBadgeClass(m.access)}">${esc(m.access||'—')}</span>
       ${hasCredential
@@ -2151,6 +2156,7 @@ function initAddStaffForm() {
   document.getElementById('add-staff-title').textContent = m ? 'Editar Membro' : 'Novo Membro';
   document.getElementById('staff-name').value = m ? m.name : '';
   document.getElementById('staff-role').value = m ? m.role : '';
+  document.getElementById('staff-company').value = m ? m.company || '' : '';
   document.getElementById('staff-email').value = m ? m.email : '';
   document.getElementById('staff-phone').value = m ? m.phone : '';
   document.getElementById('staff-notes').value = m ? m.notes || '' : '';
@@ -2253,6 +2259,7 @@ async function saveMember() {
     eventId: currentEventId,
     name,
     role: document.getElementById('staff-role').value.trim(),
+    company: document.getElementById('staff-company').value.trim(),
     email: document.getElementById('staff-email').value.trim(),
     phone: document.getElementById('staff-phone').value.trim(),
     notes: document.getElementById('staff-notes').value.trim(),
@@ -2464,6 +2471,7 @@ async function renderCredential() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       ${infoRow('Nome', member.name)}
       ${infoRow('Função', member.role || '—')}
+      ${member.company ? infoRow('Empresa / Equipa', member.company) : ''}
       ${infoRow('Acesso / Permissão', member.access)}
       ${infoRow('Dias', daysStr)}
       ${member.schedule ? infoRow('Horário', member.schedule) : ''}
@@ -2566,6 +2574,7 @@ function openSendCredential() {
   info.innerHTML = `
     <strong>${esc(member.name)}</strong><br>
     ${member.role ? `<span style="color:var(--text2)">${esc(member.role)}</span><br>` : ''}
+    ${member.company ? `<span style="color:var(--text-muted);font-size:12px;">${esc(member.company)}</span><br>` : ''}
     <span style="color:var(--blue);font-weight:600">${esc(member.access||'')}</span>
     ${member.credentialId ? `<br><span style="font-family:monospace;font-size:11px;color:var(--text2)">${esc(member.credentialId)}</span>` : ''}
   `;
@@ -2584,6 +2593,7 @@ function _buildCredentialMessage() {
     `A tua credencial para *${event}*${date ? ` (${date})` : ''} está pronta.`,
     ``,
     `• Função: ${member.role || '—'}`,
+    member.company ? `• Empresa: ${member.company}` : '',
     `• Acesso: ${member.access || '—'}`,
     `• Código: ${member.credentialId || '—'}`,
     member.schedule ? `• Horário: ${member.schedule}` : '',
@@ -2758,7 +2768,7 @@ function handleCredentialScan(text, ev) {
     if (alreadyIn) {
       const t = new Date(alreadyIn.ts).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
       playBeep('warn');
-      showScanResult('warn', member.name, member.role, `⚠️ Já entrou às ${t}`, member.access, ev.name);
+      showScanResult('warn', member.name, member.role, `⚠️ Já entrou às ${t}`, member.access, ev.name, member.company);
       return;
     }
 
@@ -2771,7 +2781,7 @@ function handleCredentialScan(text, ev) {
     scanOkCount++;
     document.getElementById('scan-count-ok').textContent = scanOkCount;
     playBeep('ok');
-    showScanResult('valid', member.name, member.role, '✓ Entrada permitida', member.access, ev.name);
+    showScanResult('valid', member.name, member.role, '✓ Entrada permitida', member.access, ev.name, member.company);
   } catch(e) {
     scanErrCount++;
     document.getElementById('scan-count-err').textContent = scanErrCount;
@@ -2780,7 +2790,7 @@ function handleCredentialScan(text, ev) {
   }
 }
 
-function showScanResult(type, name, role, msg, access, eventName) {
+function showScanResult(type, name, role, msg, access, eventName, company) {
   const overlay = document.getElementById('scan-result-overlay');
   const card = document.getElementById('scan-result-card');
   const icon = document.getElementById('scan-result-icon');
@@ -2798,7 +2808,7 @@ function showScanResult(type, name, role, msg, access, eventName) {
   }
 
   document.getElementById('scan-result-name').textContent = name || '—';
-  document.getElementById('scan-result-role').textContent = role || '';
+  document.getElementById('scan-result-role').textContent = [role, company].filter(Boolean).join(' · ');
   document.getElementById('scan-result-event').textContent = eventName || '';
   document.getElementById('scan-result-msg').textContent = msg || '';
   document.getElementById('scan-result-msg').style.color = type === 'valid' ? 'var(--green)' : type === 'warn' ? 'var(--gold)' : 'var(--red)';
