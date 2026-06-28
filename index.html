@@ -663,6 +663,71 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 <!-- ══════════════════════════════════════════════
      LANDING
 ══════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════
+     LOGIN VIEW
+══════════════════════════════════════════════ -->
+<div id="view-login" class="view">
+  <div class="landing-bg"></div>
+  <div class="landing-inner" style="justify-content:center;">
+    <div style="width:100%;max-width:360px;padding:24px 0;">
+      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px;">
+        <svg width="56" height="75" viewBox="0 0 120 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="54" y="0" width="12" height="18" rx="6" fill="#2259e0"/>
+          <rect x="57" y="3" width="6" height="12" rx="3" fill="#0d0e1c"/>
+          <rect x="58" y="16" width="4" height="10" fill="#2259e0"/>
+          <rect x="10" y="25" width="100" height="128" rx="18" fill="#2259e0"/>
+          <rect x="10" y="25" width="100" height="64" rx="18" fill="white" opacity="0.06"/>
+          <path d="M67 44 L53 75 L62 75 L55 100 L73 65 L63 65 Z" fill="white"/>
+          <text x="60" y="122" font-family="Arial" font-weight="900" font-size="13" fill="white" text-anchor="middle" letter-spacing="3">STAGE</text>
+          <text x="60" y="140" font-family="Arial" font-weight="900" font-size="13" fill="white" text-anchor="middle" letter-spacing="3">ACCESS</text>
+        </svg>
+        <div style="font-size:20px;font-weight:800;letter-spacing:2px;color:var(--text);margin-top:14px;">STAGE ACCESS</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:4px;">Event Credentialing Platform</div>
+      </div>
+
+      <div class="card" style="padding:24px;">
+        <div id="login-error" style="display:none;background:rgba(224,85,85,.1);border:1px solid var(--red);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:16px;"></div>
+
+        <!-- Login form -->
+        <div id="login-form-wrap">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input id="login-email" class="form-input" type="email" placeholder="o-teu@email.com" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input id="login-password" class="form-input" type="password" placeholder="••••••••" autocomplete="current-password"
+              onkeydown="if(event.key==='Enter') doLogin()">
+          </div>
+          <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px;" onclick="doLogin()" id="login-btn">
+            Entrar
+          </button>
+          <div style="text-align:center;margin-top:16px;">
+            <button class="btn btn-ghost btn-sm" onclick="showForgotPassword()">Esqueci a password</button>
+          </div>
+        </div>
+
+        <!-- Forgot password -->
+        <div id="forgot-form-wrap" style="display:none;">
+          <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Introduz o teu email para receber o link de recuperação.</p>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input id="forgot-email" class="form-input" type="email" placeholder="o-teu@email.com">
+          </div>
+          <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px;" onclick="doForgotPassword()">Enviar link</button>
+          <div style="text-align:center;margin-top:12px;">
+            <button class="btn btn-ghost btn-sm" onclick="showLoginForm()">← Voltar</button>
+          </div>
+        </div>
+      </div>
+
+      <p style="font-size:11px;color:var(--text2);text-align:center;margin-top:16px;opacity:.6;">
+        Acesso apenas por convite. Contacta o administrador.
+      </p>
+    </div>
+  </div>
+</div>
+
 <div id="view-landing" class="view active">
   <div class="landing-bg"></div>
   <div class="landing-inner">
@@ -728,10 +793,32 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       Stage Access
     </div>
     <div style="flex:1"></div>
-    <button class="btn btn-primary btn-sm" onclick="showView('create-event')">
+    <button class="btn btn-primary btn-sm" onclick="showView('create-event')" id="btn-new-event">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Novo Evento
     </button>
+    <!-- User menu -->
+    <div style="position:relative;margin-left:8px;">
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="toggleUserMenu()" id="user-menu-btn" title="Conta"
+        style="width:34px;height:34px;border-radius:50%;background:var(--surface2);font-size:13px;font-weight:700;color:var(--blue);" id="user-avatar-btn">
+        <span id="user-avatar-initials">?</span>
+      </button>
+      <div id="user-menu" style="display:none;position:absolute;right:0;top:42px;background:var(--surface);border:1px solid var(--border);border-radius:12px;min-width:200px;padding:8px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.3);">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border);margin-bottom:6px;">
+          <div id="user-menu-name" style="font-size:13px;font-weight:700;color:var(--text);">—</div>
+          <div id="user-menu-email" style="font-size:11px;color:var(--text2);margin-top:2px;">—</div>
+          <div id="user-menu-role-badge" style="margin-top:6px;display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:99px;background:var(--blue);color:#fff;">—</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:10px;" onclick="showView('users');toggleUserMenu();" id="btn-manage-users">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Gerir Utilizadores
+        </button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:10px;color:var(--red);" onclick="doLogout();toggleUserMenu();">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sair
+        </button>
+      </div>
+    </div>
   </div>
   <div class="page-content">
     <div class="section-header" style="margin-top:8px">
@@ -949,20 +1036,33 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
     <div class="card">
       <!-- Photo picker -->
       <div class="form-group" style="display:flex;align-items:center;gap:16px;">
-        <div id="staff-photo-preview" onclick="document.getElementById('staff-photo-input').click()"
-          style="width:72px;height:72px;border-radius:50%;background:var(--surface2);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;transition:border-color .15s;">
+        <!-- Avatar circle — click to pick from gallery -->
+        <div id="staff-photo-preview" onclick="document.getElementById('staff-photo-gallery').click()"
+          style="width:80px;height:80px;border-radius:50%;background:var(--surface2);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;transition:border-color .15s;position:relative;">
           <svg id="staff-photo-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
           <img id="staff-photo-img" src="" style="display:none;width:100%;height:100%;object-fit:cover;">
         </div>
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;">Foto do Membro</div>
           <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Aparece na credencial gerada</div>
-          <div style="display:flex;gap:8px;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('staff-photo-input').click()">Escolher foto</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <!-- Gallery pick -->
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('staff-photo-gallery').click()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Galeria
+            </button>
+            <!-- Camera — capture="user" opens front camera on mobile -->
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('staff-photo-camera').click()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Câmara
+            </button>
             <button type="button" class="btn btn-secondary btn-sm" id="staff-photo-clear" style="display:none" onclick="clearStaffPhoto()">Remover</button>
           </div>
         </div>
-        <input id="staff-photo-input" type="file" accept="image/*" style="display:none" onchange="handleStaffPhoto(this)">
+        <!-- Gallery input — no capture attribute, opens file picker / gallery -->
+        <input id="staff-photo-gallery" type="file" accept="image/*" style="display:none" onchange="handleStaffPhoto(this)">
+        <!-- Camera input — capture="user" = front camera on mobile -->
+        <input id="staff-photo-camera" type="file" accept="image/*" capture="user" style="display:none" onchange="handleStaffPhoto(this)">
       </div>
       <div class="form-group">
         <label class="form-label">Nome Completo *</label>
@@ -1328,6 +1428,43 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════
+     USERS VIEW (admin only)
+══════════════════════════════════════════════ -->
+<div id="view-users" class="view">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showView('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Voltar
+    </button>
+    <div class="topbar-title">Utilizadores</div>
+  </div>
+  <div class="page-content">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><span class="card-title">Convidar Utilizador</span></div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="invite-email" class="form-input" type="email" placeholder="email@exemplo.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Função</label>
+        <select id="invite-role" class="form-select">
+          <option value="admin">Admin — acesso total</option>
+          <option value="producao" selected>Produção — gerir eventos e credenciais</option>
+          <option value="marketing">Marketing — ver e exportar</option>
+          <option value="ticketing">Ticketing — só scanner</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="inviteUser()" style="width:100%;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        Enviar Convite
+      </button>
+    </div>
+    <div class="section-header" style="margin-top:0"><span class="section-title">Equipa</span></div>
+    <div id="users-list"><div class="empty-state"><p>A carregar...</p></div></div>
+  </div>
+</div>
+
 <!-- Export Modal -->
 <div class="modal-overlay" id="modal-export">
   <div class="modal" style="max-width:340px;width:100%">
@@ -1436,6 +1573,7 @@ const fromDBCheckin = r => ({ id: r.id, credentialId: r.credential_id, eventId: 
 //  STATE (in-memory cache)
 // ════════════════════════════════════════════════════════
 let state = { events: [], staff: [], checkins: [] };
+let currentUser = null;   // { id, email, name, role }
 let currentEventId = null;
 let currentMemberId = null;
 let editingEventId = null;
@@ -1551,6 +1689,7 @@ function showView(name, pushStack = true) {
   if (name === 'create-event') initCreateEventForm();
   if (name === 'add-staff') initAddStaffForm();
   if (name === 'credential') renderCredential();
+  if (name === 'users') renderUsersView();
 }
 
 function goBack() {
@@ -2064,9 +2203,24 @@ function setStaffPhotoPreview(src) {
 }
 function handleStaffPhoto(input) {
   const file = input.files[0]; if (!file) return;
+  // Resize to max 400×400 before storing (keeps DB small)
   const reader = new FileReader();
-  reader.onload = e => setStaffPhotoPreview(e.target.result);
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 400;
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(size / img.width, size / img.height, 1);
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      setStaffPhotoPreview(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = e.target.result;
+  };
   reader.readAsDataURL(file);
+  // Reset input so same file can be selected again
+  input.value = '';
 }
 function clearStaffPhoto() { setStaffPhotoPreview(null); }
 
@@ -3509,11 +3663,182 @@ async function generateCredentialImage(member, ev) {
 }
 
 // ════════════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════════════
+const ROLE_LABELS = { admin:'Admin', producao:'Produção', marketing:'Marketing', ticketing:'Ticketing' };
+const ROLE_COLOURS = { admin:'#2259e0', producao:'#7c3aed', marketing:'#0891b2', ticketing:'#059669' };
+
+async function loadUserProfile(userId, email) {
+  const { data } = await db.from('user_profiles').select('*').eq('id', userId).single();
+  if (data) return data;
+  // First-time login — create profile (first user becomes admin)
+  const { count } = await db.from('user_profiles').select('*', { count:'exact', head:true });
+  const role = (count === 0) ? 'admin' : 'ticketing';
+  const profile = { id: userId, email, name: email.split('@')[0], role };
+  await db.from('user_profiles').insert(profile);
+  return profile;
+}
+
+function applyRolePermissions(role) {
+  // Hide/show features based on role
+  const isAdmin    = role === 'admin';
+  const canManage  = role === 'admin' || role === 'producao';
+  const canView    = role === 'marketing';
+  const scanOnly   = role === 'ticketing';
+
+  // Dashboard: hide "Novo Evento" for marketing/ticketing
+  const btnNew = document.getElementById('btn-new-event');
+  if (btnNew) btnNew.style.display = canManage ? '' : 'none';
+
+  // User management: admin only
+  const btnUsers = document.getElementById('btn-manage-users');
+  if (btnUsers) btnUsers.style.display = isAdmin ? '' : 'none';
+
+  // If ticketing: go straight to scanner
+  if (scanOnly) {
+    showView('landing', false);
+    // Hide master event button, keep only scanner
+    document.querySelectorAll('.btn-landing-master').forEach(b => b.style.display = 'none');
+    return;
+  }
+  if (canView) {
+    // Marketing: hide add/edit/delete staff buttons (done dynamically in render)
+  }
+}
+
+function updateUserMenuUI() {
+  if (!currentUser) return;
+  document.getElementById('user-avatar-initials').textContent =
+    (currentUser.name || currentUser.email || '?').slice(0,2).toUpperCase();
+  document.getElementById('user-menu-name').textContent  = currentUser.name || '—';
+  document.getElementById('user-menu-email').textContent = currentUser.email || '—';
+  const badge = document.getElementById('user-menu-role-badge');
+  badge.textContent = ROLE_LABELS[currentUser.role] || currentUser.role;
+  badge.style.background = ROLE_COLOURS[currentUser.role] || '#555';
+}
+
+function toggleUserMenu() {
+  const m = document.getElementById('user-menu');
+  m.style.display = m.style.display === 'none' ? '' : 'none';
+}
+document.addEventListener('click', e => {
+  const btn = document.getElementById('user-menu-btn');
+  const menu = document.getElementById('user-menu');
+  if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) menu.style.display = 'none';
+});
+
+// Login
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const btn   = document.getElementById('login-btn');
+  const err   = document.getElementById('login-error');
+  err.style.display = 'none';
+  if (!email || !pass) { err.textContent = 'Preenche email e password.'; err.style.display = ''; return; }
+  btn.textContent = 'A entrar…'; btn.disabled = true;
+  const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+  btn.textContent = 'Entrar'; btn.disabled = false;
+  if (error) { err.textContent = error.message === 'Invalid login credentials' ? 'Email ou password incorrectos.' : error.message; err.style.display = ''; return; }
+  await afterLogin(data.user);
+}
+
+async function afterLogin(user) {
+  const profile = await loadUserProfile(user.id, user.email);
+  currentUser = { id: user.id, email: user.email, name: profile.name, role: profile.role };
+  updateUserMenuUI();
+  await loadDB();
+  applyRolePermissions(currentUser.role);
+  showView('landing', false);
+}
+
+async function doLogout() {
+  await db.auth.signOut();
+  currentUser = null;
+  state = { events: [], staff: [], checkins: [] };
+  showView('login', false);
+}
+
+function showLoginForm()     { document.getElementById('login-form-wrap').style.display = ''; document.getElementById('forgot-form-wrap').style.display = 'none'; document.getElementById('login-error').style.display = 'none'; }
+function showForgotPassword(){ document.getElementById('login-form-wrap').style.display = 'none'; document.getElementById('forgot-form-wrap').style.display = ''; document.getElementById('login-error').style.display = 'none'; }
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) return;
+  const { error } = await db.auth.resetPasswordForEmail(email);
+  if (error) { toast('Erro: ' + error.message, 'error'); }
+  else { toast('Link enviado para ' + email, 'success'); showLoginForm(); }
+}
+
+// User management (admin only)
+async function renderUsersView() {
+  const { data: users } = await db.from('user_profiles').select('*').order('created_at');
+  const list = document.getElementById('users-list');
+  if (!users || !users.length) { list.innerHTML = '<div class="empty-state"><p>Sem utilizadores</p></div>'; return; }
+  list.innerHTML = users.map(u => `
+    <div class="card" style="padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
+      <div style="width:38px;height:38px;border-radius:50%;background:${ROLE_COLOURS[u.role]||'#555'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;">
+        ${(u.name||u.email||'?').slice(0,2).toUpperCase()}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(u.name||'—')}</div>
+        <div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(u.email||'')}</div>
+      </div>
+      <select class="form-select" style="width:auto;font-size:12px;padding:4px 8px;height:32px;" onchange="changeUserRole('${u.id}',this.value)" ${u.id === currentUser?.id ? 'disabled title="Não podes alterar o teu próprio role"' : ''}>
+        ${['admin','producao','marketing','ticketing'].map(r => `<option value="${r}" ${u.role===r?'selected':''}>${ROLE_LABELS[r]}</option>`).join('')}
+      </select>
+      ${u.id !== currentUser?.id ? `<button class="btn btn-danger btn-sm" onclick="removeUser('${u.id}')">✕</button>` : ''}
+    </div>`).join('');
+}
+
+async function changeUserRole(userId, newRole) {
+  const { error } = await db.from('user_profiles').update({ role: newRole }).eq('id', userId);
+  if (error) toast('Erro ao alterar role', 'error');
+  else toast('Role actualizado', 'success');
+}
+
+async function removeUser(userId) {
+  if (!confirm('Remover este utilizador?')) return;
+  await db.from('user_profiles').delete().eq('id', userId);
+  renderUsersView();
+  toast('Utilizador removido');
+}
+
+async function inviteUser() {
+  const email = document.getElementById('invite-email').value.trim();
+  const role  = document.getElementById('invite-role').value;
+  if (!email) return;
+  // Supabase: send magic link invite
+  const { error } = await db.auth.admin ? db.auth.admin.inviteUserByEmail(email) : db.auth.signInWithOtp({ email });
+  // Regardless of invite method, pre-create the profile with the chosen role
+  // (will be confirmed when they first log in)
+  await db.from('user_profiles').upsert({ id: crypto.randomUUID(), email, role, name: email.split('@')[0] }, { onConflict: 'email' });
+  if (error && !error.message.includes('already')) { toast('Erro: ' + error.message, 'error'); return; }
+  document.getElementById('invite-email').value = '';
+  toast(`Convite enviado para ${email}`, 'success');
+  renderUsersView();
+}
+
+// ════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════
 (async () => {
-  await loadDB();
-  showView('landing', false);
+  // Check existing session
+  const { data: { session } } = await db.auth.getSession();
+  if (session?.user) {
+    await afterLogin(session.user);
+  } else {
+    showView('login', false);
+  }
+
+  // Listen for auth changes
+  db.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session?.user && !currentUser) {
+      await afterLogin(session.user);
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      showView('login', false);
+    }
+  });
 })();
 </script>
 </body>
