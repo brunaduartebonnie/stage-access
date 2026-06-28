@@ -1240,17 +1240,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
           <div class="badge-access-chip" id="badge-access-chip">—</div>
           <div class="badge-date" id="badge-date">—</div>
         </div>
-        <!-- Days & schedule — shown only when set -->
-        <div id="badge-validity-section" style="display:none;padding:6px 16px 0;">
-          <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:6px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;justify-content:center;">
-            <div id="badge-days-chips" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;"></div>
-            <div id="badge-schedule-pill" style="display:none;background:rgba(255,255,255,.12);border-radius:99px;padding:2px 10px;font-size:10px;font-weight:700;letter-spacing:.5px;color:rgba(255,255,255,.9);white-space:nowrap;"></div>
-          </div>
-        </div>
         <div class="badge-codes-section">
           <div class="badge-qr" id="badge-qr-code"></div>
           <div class="badge-barcode-wrap">
             <svg id="badge-barcode"></svg>
+          </div>
+          <!-- Days & schedule — shown only when set -->
+          <div id="badge-validity-section" style="display:none;width:100%;text-align:center;">
+            <div id="badge-days-chips" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-bottom:4px;"></div>
+            <div id="badge-schedule-pill" style="display:none;font-size:10px;font-weight:700;letter-spacing:.5px;color:rgba(255,255,255,.7);"></div>
           </div>
           <div class="badge-footer-label" id="badge-cred-id">—</div>
         </div>
