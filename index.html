@@ -547,6 +547,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 }
 .staff-row:last-child{border-bottom:none;}
 .staff-row:hover{background:var(--surface2);}
+.staff-row-selected{background:rgba(34,89,224,.07);}
+.staff-row-selected:hover{background:rgba(34,89,224,.12);}
 .staff-row-avatar{
   width:30px;height:30px;border-radius:50%;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
@@ -882,7 +884,20 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
     </div>
   </div>
   <div class="page-content">
-    <div class="section-header" style="margin-top:8px">
+    <!-- Global stats -->
+    <div id="dash-global-stats" style="display:none;margin-bottom:16px;">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="dash-stat-events">0</div><div class="stat-label">Eventos</div></div>
+        <div class="stat-card"><div class="stat-value" id="dash-stat-creds">0</div><div class="stat-label">Credenciais</div></div>
+        <div class="stat-card"><div class="stat-value" id="dash-stat-checkins">0</div><div class="stat-label">Entradas</div></div>
+      </div>
+    </div>
+    <!-- Search -->
+    <div style="position:relative;margin-bottom:10px;">
+      <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none;" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="dash-search" class="form-input" type="search" placeholder="Pesquisar eventos ou membros..." style="padding-left:36px;height:38px;font-size:13px;" oninput="renderDashboard()">
+    </div>
+    <div class="section-header" style="margin-top:0">
       <span class="section-title">Os Meus Eventos</span>
       <div style="display:flex;gap:6px;">
         <button class="btn btn-ghost btn-sm" id="dash-tab-active" onclick="setDashTab('active')" style="font-size:12px;font-weight:700;color:var(--blue)">Activos</button>
@@ -1102,6 +1117,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
         <input id="staff-search" class="form-input" type="search" placeholder="Pesquisar membro..." style="padding-left:36px;height:38px;font-size:13px;" oninput="renderStaffList()">
       </div>
       <div id="staff-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <!-- Batch action bar (hidden until selection) -->
+      <div id="batch-bar" style="display:none;background:var(--blue);color:#fff;border-radius:10px;padding:10px 14px;margin-bottom:10px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span id="batch-count" style="font-size:13px;font-weight:700;flex:1;">0 selecionados</span>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none;" onclick="batchSendAll()">📤 Enviar</button>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none;" onclick="batchBlock()">🚫 Bloquear</button>
+        <button class="btn btn-sm" style="background:rgba(220,50,50,.7);color:#fff;border:none;" onclick="batchDelete()">🗑 Eliminar</button>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:none;" onclick="clearBatchSelection()">✕</button>
+      </div>
       <div id="staff-list"></div>
     </div>
 
@@ -1365,6 +1388,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       Início
     </button>
     <div class="topbar-title">Admin Check</div>
+    <button id="sound-toggle-btn" onclick="toggleScanSound()" title="Som" style="background:none;border:none;cursor:pointer;padding:6px;color:var(--text);font-size:18px;">🔊</button>
   </div>
   <!-- Offline banner -->
   <div id="offline-banner" style="display:none;background:#f59e0b;color:#000;font-size:12px;font-weight:700;text-align:center;padding:6px;letter-spacing:.5px;">
@@ -1646,6 +1670,31 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
   </div>
 </div>
 
+<!-- Onboarding Modal -->
+<div class="modal-overlay" id="modal-onboarding">
+  <div class="modal" style="max-width:400px;width:100%;text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px;">🎪</div>
+    <div class="modal-title" style="font-size:20px;">Bem-vindo ao Stage Access!</div>
+    <p style="font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:20px;">
+      A tua conta foi criada com sucesso. Antes de começar, define o teu nome e uma password pessoal.
+    </p>
+    <div class="form-group" style="text-align:left;">
+      <label class="form-label">O teu nome</label>
+      <input id="onboard-name" class="form-input" type="text" placeholder="Ex: João Silva">
+    </div>
+    <div class="form-group" style="text-align:left;">
+      <label class="form-label">Nova password</label>
+      <input id="onboard-password" class="form-input" type="password" placeholder="Mínimo 6 caracteres">
+    </div>
+    <div class="form-group" style="text-align:left;">
+      <label class="form-label">Confirmar password</label>
+      <input id="onboard-password2" class="form-input" type="password" placeholder="Repete a password">
+    </div>
+    <div id="onboard-feedback" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:12px;"></div>
+    <button class="btn btn-primary btn-lg" style="width:100%;" onclick="completeOnboarding()">Entrar →</button>
+  </div>
+</div>
+
 <!-- Profile Modal -->
 <div class="modal-overlay" id="modal-profile">
   <div class="modal" style="max-width:360px;width:100%">
@@ -1924,6 +1973,71 @@ function setDashTab(tab) {
 
 function renderDashboard() {
   const list = document.getElementById('events-list');
+  const q = (document.getElementById('dash-search')?.value || '').toLowerCase().trim();
+
+  // Global stats (active events only)
+  const activeEvents = state.events.filter(ev => !ev.archived);
+  const totalCreds = state.staff.filter(s => activeEvents.find(e => e.id === s.eventId)).length;
+  const totalCheckins = state.checkins.filter(c => activeEvents.find(e => e.id === c.eventId)).length;
+  const statsWrap = document.getElementById('dash-global-stats');
+  if (statsWrap && activeEvents.length > 0) {
+    statsWrap.style.display = '';
+    document.getElementById('dash-stat-events').textContent = activeEvents.length;
+    document.getElementById('dash-stat-creds').textContent = totalCreds;
+    document.getElementById('dash-stat-checkins').textContent = totalCheckins;
+  } else if (statsWrap) statsWrap.style.display = 'none';
+
+  // If searching, search across all events + members
+  if (q) {
+    const memberMatches = state.staff.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      (m.role||'').toLowerCase().includes(q) ||
+      (m.company||'').toLowerCase().includes(q) ||
+      (m.access||'').toLowerCase().includes(q)
+    );
+    const eventIds = [...new Set(memberMatches.map(m => m.eventId))];
+    const eventMatches = state.events.filter(ev =>
+      ev.name.toLowerCase().includes(q) ||
+      (ev.artist||'').toLowerCase().includes(q) ||
+      (ev.venue||'').toLowerCase().includes(q) ||
+      eventIds.includes(ev.id)
+    );
+    if (!eventMatches.length && !memberMatches.length) {
+      list.innerHTML = `<div class="empty-state"><p>Nenhum resultado para "${esc(q)}"</p></div>`;
+      return;
+    }
+    // Show member results grouped by event
+    const html = [];
+    if (memberMatches.length) {
+      html.push(`<div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Membros (${memberMatches.length})</div>`);
+      memberMatches.slice(0,20).forEach(m => {
+        const ev = state.events.find(e => e.id === m.eventId);
+        html.push(`<div class="list-item" onclick="openEvent('${m.eventId}');setTimeout(()=>openMember('${m.id}'),300)">
+          <div class="list-item-avatar" style="background:var(--surface2);font-size:13px;font-weight:700">${m.name.slice(0,2).toUpperCase()}</div>
+          <div class="list-item-body">
+            <div class="list-item-name">${esc(m.name)}</div>
+            <div class="list-item-sub">${esc(m.access||'—')} · ${esc(ev?.name||'—')}</div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>`);
+      });
+    }
+    if (eventMatches.length) {
+      html.push(`<div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin:12px 0 8px;">Eventos (${eventMatches.length})</div>`);
+      eventMatches.forEach(ev => {
+        const mc = state.staff.filter(s => s.eventId === ev.id).length;
+        html.push(`<div class="list-item" onclick="openEvent('${ev.id}')">
+          <div class="list-item-avatar">${ev.eventLogoData ? `<img src="${ev.eventLogoData}">` : `<span style="font-size:20px">${(ev.name||'?')[0].toUpperCase()}</span>`}</div>
+          <div class="list-item-body"><div class="list-item-name">${esc(ev.name)}</div><div class="list-item-sub">${esc(ev.artist||'—')}</div></div>
+          <span class="badge badge-gray">${mc} staff</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>`);
+      });
+    }
+    list.innerHTML = html.join('');
+    return;
+  }
+
   const filtered = state.events.filter(ev => dashTab === 'archived' ? ev.archived : !ev.archived);
   if (!filtered.length) {
     list.innerHTML = `<div class="empty-state">
@@ -1972,6 +2086,8 @@ async function toggleArchiveEvent() {
 
 function openEvent(id) {
   currentEventId = id;
+  staffActiveFilter = null;
+  batchSelection.clear();
   showView('event-detail');
 }
 
@@ -2292,6 +2408,83 @@ function renderEventDetail() {
 }
 
 let staffActiveFilter = null; // null = todos, 'blocked' = bloqueados, or access type string
+let batchSelection = new Set();
+
+function handleStaffRowClick(e, id) {
+  if (batchSelection.size > 0) { toggleBatchSelect(id); return; }
+  openMember(id);
+}
+
+function toggleBatchSelect(id) {
+  if (batchSelection.has(id)) batchSelection.delete(id);
+  else batchSelection.add(id);
+  updateBatchBar();
+  renderStaffList();
+}
+
+function updateBatchBar() {
+  const bar = document.getElementById('batch-bar');
+  const count = document.getElementById('batch-count');
+  if (!bar) return;
+  if (batchSelection.size > 0) {
+    bar.style.display = 'flex';
+    count.textContent = `${batchSelection.size} selecionado${batchSelection.size > 1 ? 's' : ''}`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function clearBatchSelection() {
+  batchSelection.clear();
+  updateBatchBar();
+  renderStaffList();
+}
+
+function batchSendAll() {
+  const members = [...batchSelection].map(id => state.staff.find(s => s.id === id)).filter(Boolean);
+  const withPhone = members.filter(m => m.phone);
+  if (!withPhone.length) { toast('Nenhum membro selecionado tem telefone', 'error'); return; }
+  if (!confirm(`Enviar credencial via WhatsApp a ${withPhone.length} membro(s)?`)) return;
+  withPhone.forEach(m => {
+    currentMemberId = m.id;
+    const { body } = _buildCredentialMessage();
+    const phone = m.phone.replace(/\D/g,'');
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(body)}`, '_blank');
+    logActivity(m.eventId, 'credencial_enviada', `WhatsApp em lote → ${m.name}`);
+  });
+  clearBatchSelection();
+  toast(`Enviado para ${withPhone.length} membro(s)`, 'success');
+}
+
+async function batchBlock() {
+  const members = [...batchSelection].map(id => state.staff.find(s => s.id === id)).filter(Boolean);
+  const allBlocked = members.every(m => m.blocked);
+  const action = allBlocked ? 'desbloquear' : 'bloquear';
+  if (!confirm(`${action.charAt(0).toUpperCase()+action.slice(1)} ${members.length} membro(s)?`)) return;
+  showLoading(`A ${action}…`);
+  for (const m of members) {
+    m.blocked = !allBlocked;
+    await upsertStaff(m);
+    logActivity(m.eventId, 'membro_editado', `${allBlocked ? 'Desbloqueado' : 'Bloqueado'} em lote: ${m.name}`);
+  }
+  hideLoading();
+  clearBatchSelection();
+  toast(`${members.length} membro(s) ${allBlocked ? 'desbloqueados' : 'bloqueados'}`, 'success');
+}
+
+async function batchDelete() {
+  const members = [...batchSelection].map(id => state.staff.find(s => s.id === id)).filter(Boolean);
+  if (!confirm(`Eliminar ${members.length} membro(s)? Esta ação não pode ser desfeita.`)) return;
+  showLoading('A eliminar…');
+  for (const m of members) {
+    await deleteStaffById(m.id);
+    logActivity(m.eventId, 'membro_eliminado', `Eliminado em lote: ${m.name}`);
+  }
+  hideLoading();
+  clearBatchSelection();
+  renderEventDetail();
+  toast(`${members.length} membro(s) eliminados`, 'success');
+}
 
 function renderStaffFilters(members) {
   const wrap = document.getElementById('staff-filters');
@@ -2383,7 +2576,13 @@ function renderStaffCard(m) {
     ? `<div class="staff-row-avatar" style="background:transparent;padding:0;overflow:hidden;"><img src="${m.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>`
     : `<div class="staff-row-avatar" style="background:${accessBg(m.access)};color:${accessFg(m.access)}">${initials}</div>`;
   const hasCredential = !!m.credentialId;
-  return `<div class="staff-row" onclick="openMember('${m.id}')" style="${m.blocked ? 'opacity:.6;' : ''}">
+  const isSelected = batchSelection.has(m.id);
+  return `<div class="staff-row ${isSelected ? 'staff-row-selected' : ''}" onclick="handleStaffRowClick(event,'${m.id}')" style="${m.blocked ? 'opacity:.65;' : ''}">
+    <div onclick="event.stopPropagation();toggleBatchSelect('${m.id}')" style="padding:4px;margin-right:2px;cursor:pointer;">
+      <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${isSelected ? 'var(--blue)' : 'var(--border)'};background:${isSelected ? 'var(--blue)' : 'transparent'};display:flex;align-items:center;justify-content:center;transition:all .15s;">
+        ${isSelected ? '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+      </div>
+    </div>
     ${avatarHTML}
     <div class="staff-row-name">
       ${m.blocked ? '<span style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:.5px;">🚫 BLOQUEADO · </span>' : ''}
@@ -2393,8 +2592,8 @@ function renderStaffCard(m) {
     <div class="staff-row-right">
       <span class="badge ${accessBadgeClass(m.access)}">${esc(m.access||'—')}</span>
       ${hasCredential
-        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13" style="color:var(--green)" title="Credencial emitida"><polyline points="20 6 9 17 4 12"/></svg>`
-        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="color:var(--text-dim)" title="Sem credencial"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`}
+        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13" style="color:var(--green)"><polyline points="20 6 9 17 4 12"/></svg>`
+        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="color:var(--text-dim)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
   </div>`;
@@ -3319,6 +3518,19 @@ function handleCredentialScan(text, ev) {
       return;
     }
 
+    // Check event date validity (if event has a date, only allow on that day)
+    if (ev.date) {
+      const today = new Date().toISOString().slice(0,10);
+      if (ev.date !== today) {
+        const evDateStr = new Date(ev.date+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long',year:'numeric'});
+        playBeep('err');
+        showScanResult('invalid', member.name, member.role, `⛔ Fora da data do evento (${evDateStr})`, member.access, ev.name, member.company);
+        scanErrCount++;
+        document.getElementById('scan-count-err').textContent = scanErrCount;
+        return;
+      }
+    }
+
     // Check if credential is blocked
     if (member.blocked) {
       playBeep('err');
@@ -3445,7 +3657,18 @@ function dismissScanResult() {
 }
 
 // ── BEEP (Web Audio API — no audio files needed) ──────────
+let scanSoundEnabled = localStorage.getItem('sa_sound') !== 'off';
+
+function toggleScanSound() {
+  scanSoundEnabled = !scanSoundEnabled;
+  localStorage.setItem('sa_sound', scanSoundEnabled ? 'on' : 'off');
+  const btn = document.getElementById('sound-toggle-btn');
+  if (btn) btn.textContent = scanSoundEnabled ? '🔊' : '🔇';
+  toast(scanSoundEnabled ? 'Som activado' : 'Som desactivado', 'success');
+}
+
 function playBeep(type) {
+  if (!scanSoundEnabled) return;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
@@ -3828,6 +4051,17 @@ function handleCSVUpload(input) {
       fb.textContent = result.error;
       fb.className = 'import-feedback show error';
       return;
+    }
+    // Check duplicates
+    const existingNames = state.staff.filter(s => s.eventId === currentEventId).map(s => s.name.toLowerCase().trim());
+    const dupes = result.members.filter(m => existingNames.includes(m.name.toLowerCase().trim()));
+    if (dupes.length > 0) {
+      const dupeNames = dupes.slice(0,5).map(m => m.name).join(', ');
+      const more = dupes.length > 5 ? ` e mais ${dupes.length - 5}` : '';
+      if (!confirm(`⚠️ ${dupes.length} membro(s) já existem:\n${dupeNames}${more}\n\nContinuar e criar duplicados?`)) {
+        result.members = result.members.filter(m => !existingNames.includes(m.name.toLowerCase().trim()));
+        if (!result.members.length) { fb.textContent = 'Importação cancelada — todos os membros já existem.'; fb.className = 'import-feedback show error'; return; }
+      }
     }
     showLoading(`A importar ${result.members.length} membros…`);
     try {
@@ -4748,6 +4982,18 @@ async function afterLogin(user) {
   await loadDB();
   applyRolePermissions(currentUser.role);
   showView('landing', false);
+
+  // Show onboarding for new invited users
+  if (profile.needs_onboarding) {
+    setTimeout(() => {
+      document.getElementById('onboard-name').value = profile.name !== profile.email?.split('@')[0] ? profile.name : '';
+      openModal('modal-onboarding');
+    }, 500);
+  }
+
+  // Init sound button state
+  const soundBtn = document.getElementById('sound-toggle-btn');
+  if (soundBtn) soundBtn.textContent = scanSoundEnabled ? '🔊' : '🔇';
 }
 
 async function doLogout() {
@@ -4805,16 +5051,102 @@ async function removeUser(userId) {
 async function inviteUser() {
   const email = document.getElementById('invite-email').value.trim();
   const role  = document.getElementById('invite-role').value;
-  if (!email) return;
-  // Supabase: send magic link invite
-  const { error } = await db.auth.admin ? db.auth.admin.inviteUserByEmail(email) : db.auth.signInWithOtp({ email });
-  // Regardless of invite method, pre-create the profile with the chosen role
-  // (will be confirmed when they first log in)
-  await db.from('user_profiles').upsert({ id: crypto.randomUUID(), email, role, name: email.split('@')[0] }, { onConflict: 'email' });
-  if (error && !error.message.includes('already')) { toast('Erro: ' + error.message, 'error'); return; }
-  document.getElementById('invite-email').value = '';
-  toast(`Convite enviado para ${email}`, 'success');
-  renderUsersView();
+  if (!email) { toast('Introduz um email', 'error'); return; }
+
+  showLoading('A criar convite…');
+  try {
+    // Generate a temporary password
+    const tempPass = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6).toUpperCase() + '!';
+    // Create account
+    const { data, error } = await db.auth.signUp({ email, password: tempPass });
+    if (error && !error.message.toLowerCase().includes('already')) throw error;
+
+    // Pre-create profile with role (onboarding will update name/password)
+    const userId = data?.user?.id;
+    if (userId) {
+      await db.from('user_profiles').upsert({ id: userId, email, role, name: email.split('@')[0], needs_onboarding: true }, { onConflict: 'id' });
+    } else {
+      // User already exists — just update role
+      await db.from('user_profiles').upsert({ email, role }, { onConflict: 'email' });
+    }
+
+    // Show credentials to share
+    hideLoading();
+    document.getElementById('invite-email').value = '';
+    const roleLabel = { admin:'Admin', producao:'Produção', marketing:'Marketing', ticketing:'Ticketing' }[role] || role;
+    const shareMsg = `🎪 *Stage Access*\n\nFoste convidado como *${roleLabel}*.\n\n📧 Email: ${email}\n🔑 Password temporária: \`${tempPass}\`\n\n🔗 ${window.location.origin}\n\n_Altera a password no primeiro acesso._`;
+
+    // Show modal to copy/share credentials
+    showInviteResult(email, tempPass, shareMsg, roleLabel);
+    renderUsersView();
+  } catch(e) {
+    hideLoading();
+    toast('Erro: ' + (e.message || 'tenta novamente'), 'error');
+  }
+}
+
+function showInviteResult(email, tempPass, shareMsg, roleLabel) {
+  const existing = document.getElementById('modal-invite-result');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modal-invite-result';
+  modal.className = 'modal-overlay';
+  modal.style.cssText = 'display:flex;';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:380px;width:100%;">
+      <button class="modal-close" onclick="document.getElementById('modal-invite-result').remove()">✕</button>
+      <div class="modal-title">✅ Convite criado!</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6;">
+        Partilha estas credenciais com <strong>${esc(email)}</strong> (${roleLabel}):
+      </p>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;font-size:13px;margin-bottom:16px;line-height:1.8;">
+        <div>📧 <strong>Email:</strong> ${esc(email)}</div>
+        <div>🔑 <strong>Password:</strong> <code style="background:var(--surface);padding:2px 6px;border-radius:4px;">${esc(tempPass)}</code></div>
+        <div>🔗 <strong>Link:</strong> ${window.location.origin}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-lg" onclick="navigator.clipboard.writeText(${JSON.stringify(shareMsg)}).then(()=>toast('Copiado!','success'))" style="background:#25D366;color:#fff;border:none;">
+          📋 Copiar mensagem
+        </button>
+        <button class="btn btn-lg" onclick="window.open('https://wa.me/?text='+encodeURIComponent(${JSON.stringify(shareMsg)}),'_blank')" style="background:#25D366;color:#fff;border:none;">
+          WhatsApp
+        </button>
+        <button class="btn btn-secondary btn-lg" onclick="document.getElementById('modal-invite-result').remove()">Fechar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// ── ONBOARDING ─────────────────────────────────────────
+async function completeOnboarding() {
+  const name = document.getElementById('onboard-name').value.trim();
+  const pw1  = document.getElementById('onboard-password').value;
+  const pw2  = document.getElementById('onboard-password2').value;
+  const fb   = document.getElementById('onboard-feedback');
+
+  if (!name) { showOnboardFeedback('Introduz o teu nome.'); return; }
+  if (!pw1 || pw1.length < 6) { showOnboardFeedback('A password deve ter pelo menos 6 caracteres.'); return; }
+  if (pw1 !== pw2) { showOnboardFeedback('As passwords não coincidem.'); return; }
+
+  try {
+    await db.auth.updateUser({ password: pw1 });
+    await db.from('user_profiles').update({ name, needs_onboarding: false }).eq('id', currentUser.id);
+    currentUser.name = name;
+    updateUserMenuUI();
+    closeModal('modal-onboarding');
+    toast(`Bem-vindo, ${name}! 🎉`, 'success');
+  } catch(e) {
+    showOnboardFeedback('Erro: ' + (e.message || 'tenta novamente'));
+  }
+}
+
+function showOnboardFeedback(msg) {
+  const fb = document.getElementById('onboard-feedback');
+  fb.textContent = msg;
+  fb.style.display = '';
+  fb.style.background = 'rgba(224,85,85,.15)';
+  fb.style.color = 'var(--red)';
+  fb.style.border = '1px solid var(--red)';
 }
 
 // ════════════════════════════════════════════════════════
