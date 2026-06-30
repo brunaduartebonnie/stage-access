@@ -4320,6 +4320,7 @@ let ds = null;
 let dsEventId = null;
 let dsLibrary = []; // [{id,src,name}]
 let dsBorderObj = null;
+let dsEditMode = false; // false = Move mode (default), true = Edit/select mode
 
 const DS_PH_LABELS = { name:'Nome da Pessoa', role:'Função / Cargo', company:'Empresa / Equipa', access:'TIPO DE ACESSO', event:'Nome do Evento', date:'Data do Evento' };
 
@@ -4371,7 +4372,7 @@ function dsInit() {
       if (ev.credentialTemplate.background) {
         document.getElementById('ds-bg-color').value = ev.credentialTemplate.background;
       }
-      ds.renderAll(); dsUpdateLayers();
+      dsApplyMode(); ds.renderAll(); dsUpdateLayers();
     });
   } else {
     // Build default layout and auto-save so all credentials use it
@@ -4535,6 +4536,7 @@ function dsLibPlace(id) {
     if (img.width > maxS || img.height > maxS) { img.scale(maxS / Math.max(img.width, img.height)); }
     img.set({ left: DS_W/2-(img.width*(img.scaleX||1))/2, top: DS_H/2-(img.height*(img.scaleY||1))/2, customType:'image', libId:id });
     ds.add(img); ds.setActiveObject(img); ds.renderAll(); dsUpdateLayers();
+    dsApplyMode(); // apply current move/edit lock state to the new object
   }, { crossOrigin:'anonymous' });
 }
 
@@ -4545,7 +4547,7 @@ function dsLibRemove(e, id) {
 }
 
 // ── BACKGROUND ──
-let dsEditMode = true; // true = editar/selecionar, false = mover
+// dsEditMode declared at top of designer init — do NOT re-declare here
 
 function dsToggleMode() {
   dsEditMode = !dsEditMode;
