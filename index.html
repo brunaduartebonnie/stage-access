@@ -643,7 +643,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
   flex:1;display:flex;align-items:center;justify-content:center;
   background:#c0c5d8;overflow:auto;padding:20px;
 }
-.fabric-shadow{box-shadow:0 8px 40px rgba(0,0,0,.3);border-radius:12px;overflow:hidden;display:block;line-height:0;}
+.fabric-shadow{box-shadow:0 8px 40px rgba(0,0,0,.3);border-radius:12px;display:block;line-height:0;}
 
 /* ── RIGHT PANEL ── */
 .ds-right{
@@ -1580,9 +1580,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       <button class="ds-pill ph" onclick="dsAddPhotoPlaceholder()">＋ Foto</button>
     </div>
     <div class="ds-opt-sep"></div>
-    <div class="ds-opt-group">
-      <span class="ds-opt-label">Modo</span>
-      <button id="ds-mode-btn" class="ds-pill ds-mode-edit" onclick="dsToggleMode()" title="Alternar entre mover e editar elementos">✏️ Editar</button>
+    <div class="ds-opt-group" style="font-size:11px;color:var(--text-muted);font-style:italic;">
+      Clica para mover · Duplo-clique para editar texto
     </div>
     <div class="ds-opt-sep"></div>
     <button class="ds-pill" onclick="dsClearAll()" style="color:var(--red)">🗑 Limpar</button>
@@ -4386,7 +4385,7 @@ function dsInit() {
   }
 
   ds.on('object:modified', dsUpdateLayers);
-  ds.on('object:added', e => { dsUpdateLayers(); dsApplyMode(); });
+  ds.on('object:added', dsUpdateLayers);
   ds.on('object:removed', dsUpdateLayers);
   ds.on('selection:created', dsUpdateProps);
   ds.on('selection:updated', dsUpdateProps);
@@ -4556,25 +4555,20 @@ function dsToggleMode() {
 
 function dsApplyMode() {
   if (!ds) return;
-  const btn = document.getElementById('ds-mode-btn');
-  if (dsEditMode) {
-    // Modo editar: toque seleciona e abre propriedades, movimento bloqueado no touch
-    ds.getObjects().forEach(o => {
-      const isFixed = o.customType === 'border';
-      o.set({ lockMovementX: true, lockMovementY: true, selectable: !isFixed, evented: !isFixed });
+  // All non-border objects are always selectable and moveable.
+  // lockMovement is NEVER set to true — objects can always be dragged.
+  ds.getObjects().forEach(o => {
+    const isFixed = o.customType === 'border';
+    o.set({
+      selectable: !isFixed,
+      evented: !isFixed,
+      lockMovementX: false,
+      lockMovementY: false,
+      hasControls: true,
+      hasBorders: true,
     });
-    ds.selection = true;
-    if (btn) { btn.textContent = '✏️ Editar'; btn.classList.add('ds-mode-edit'); btn.style.background = ''; btn.style.color = ''; }
-  } else {
-    // Modo mover (padrão): objetos podem ser arrastados livremente
-    ds.getObjects().forEach(o => {
-      const isFixed = o.customType === 'border';
-      o.set({ lockMovementX: isFixed, lockMovementY: isFixed, selectable: !isFixed, evented: !isFixed });
-    });
-    ds.selection = true;
-    if (btn) { btn.textContent = '↕️ Mover'; btn.classList.remove('ds-mode-edit'); btn.style.background = 'var(--blue)'; btn.style.color = '#fff'; }
-  }
-  ds.discardActiveObject();
+  });
+  ds.selection = true;
   ds.renderAll();
 }
 
@@ -4620,14 +4614,14 @@ function dsUpdateBorderColor(c) {
 function dsAddText() {
   if (!ds) return;
   const t = new fabric.IText('Texto aqui', { left:DS_W/2, top:DS_H/2, fontSize:20, fill:'#ffffff', fontFamily:'Arial', fontWeight:'normal', originX:'center', originY:'center', customType:'text' });
-  ds.add(t); ds.setActiveObject(t); ds.renderAll(); dsUpdateLayers();
+  ds.add(t); ds.setActiveObject(t); ds.renderAll(); dsUpdateLayers(); dsApplyMode();
 }
 
 function dsAddPlaceholder(type) {
   if (!ds) return;
   const isBig = type==='name'||type==='access';
   const t = new fabric.IText(DS_PH_LABELS[type]||type, { left:DS_W/2, top:DS_H/2, fontSize:isBig?20:13, fill:'#ffffff', fontFamily:'Arial', fontWeight:isBig?'bold':'normal', originX:'center', originY:'center', textAlign:'center', customType:'placeholder', placeholder:type });
-  ds.add(t); ds.setActiveObject(t); ds.renderAll(); dsUpdateLayers();
+  ds.add(t); ds.setActiveObject(t); ds.renderAll(); dsUpdateLayers(); dsApplyMode();
 }
 
 async function dsAddQR() {
@@ -4636,7 +4630,7 @@ async function dsAddQR() {
   if (!src) return;
   fabric.Image.fromURL(src, fImg => {
     fImg.set({ left:DS_W/2-40, top:360, customType:'qr-placeholder' });
-    ds.add(fImg); ds.setActiveObject(fImg); ds.renderAll(); dsUpdateLayers();
+    ds.add(fImg); ds.setActiveObject(fImg); ds.renderAll(); dsUpdateLayers(); dsApplyMode();
   });
 }
 
@@ -4649,7 +4643,7 @@ function dsAddBarcode() {
   document.body.removeChild(svgEl);
   fabric.Image.fromURL(src, fImg => {
     fImg.set({ left:DS_W/2-(fImg.width||200)/2, top:430, customType:'barcode-placeholder' });
-    ds.add(fImg); ds.setActiveObject(fImg); ds.renderAll(); dsUpdateLayers();
+    ds.add(fImg); ds.setActiveObject(fImg); ds.renderAll(); dsUpdateLayers(); dsApplyMode();
   });
 }
 
@@ -4682,7 +4676,7 @@ function dsAddPhotoPlaceholder() {
     rx: size/2, ry: size/2,
     width: size, height: size,
   });
-  ds.add(grp); ds.setActiveObject(grp); ds.renderAll(); dsUpdateLayers();
+  ds.add(grp); ds.setActiveObject(grp); ds.renderAll(); dsUpdateLayers(); dsApplyMode();
 }
 
 function dsClearAll() {
